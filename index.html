@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pasos y Putasos</title>
+    <link rel="icon" type="image/png" href="/assets/sprites/Dado.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Outfit:wght@400;600;700;900&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <!-- ================= PANTALLA 1: INICIO ================= -->
+    <div class="game-screen active-screen" id="screen-start">
+        <div class="screen-card start-card">
+            <h1 class="main-game-title">PASOS Y PUTASOS</h1>
+            <p class="game-tagline">GUERRA DE TRIBUS URBANAS POR DOMINAR LAS PLAYLISTS</p>
+
+            <div class="start-roster-preview">
+                <div class="roster-player-box p1-preview">
+                    <div class="preview-avatar-box">
+                        <img src="/assets/sprites/pop_ch_face.png" alt="P1 Pop" class="preview-face">
+                    </div>
+                    <div class="preview-player-name p1-color-text">JUGADOR 1</div>
+                    <div class="preview-character-type">ESTILO POP</div>
+                    <div class="mini-keys-grid p1-keys-grid">
+                        <span class="mini-key-cap">Q</span>
+                        <span class="mini-key-cap">W</span>
+                        <span class="mini-key-cap">E</span>
+                        <span class="mini-key-cap">A</span>
+                        <span class="mini-key-cap">S</span>
+                        <span class="mini-key-cap">D</span>
+                        <span class="mini-key-cap">Z</span>
+                        <span class="mini-key-cap">X</span>
+                        <span class="mini-key-cap">C</span>
+                    </div>
+                </div>
+
+                <div class="versus-badge-box">
+                    <span class="versus-text">VS</span>
+                </div>
+
+                <div class="roster-player-box p2-preview">
+                    <div class="preview-avatar-box">
+                        <img src="/assets/sprites/rock_ch_face.png" alt="P2 Rock" class="preview-face">
+                    </div>
+                    <div class="preview-player-name p2-color-text">JUGADOR 2</div>
+                    <div class="preview-character-type">ESTILO ROCK</div>
+                    <div class="mini-keys-grid p2-keys-grid">
+                        <span class="mini-key-cap">U</span>
+                        <span class="mini-key-cap">I</span>
+                        <span class="mini-key-cap">O</span>
+                        <span class="mini-key-cap">J</span>
+                        <span class="mini-key-cap">K</span>
+                        <span class="mini-key-cap">L</span>
+                        <span class="mini-key-cap">M</span>
+                        <span class="mini-key-cap">,</span>
+                        <span class="mini-key-cap">.</span>
+                    </div>
+                </div>
+            </div>
+
+            <button class="arcade-main-btn" id="btn-start-game">
+                <span class="btn-text">INICIAR PARTIDA</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ================= PANTALLA 2: JUEGO ACTIVO ================= -->
+    <div class="game-screen" id="screen-game">
+        <div class="game-wrapper" id="game-wrapper">
+            <!-- Arena Principal de Batalla: 2 Tableros Horizontales Integrados -->
+            <main class="battle-arena">
+                <!-- JUGADOR 1 -->
+                <section class="player-panel" id="player-1-panel">
+                    <div class="player-header">
+                        <span class="player-badge p1-badge">P1</span>
+                        <div class="player-lives" id="p1-lives" title="Prestigio Jugador 1">
+                            <img src="/assets/sprites/Vida.png" alt="Prestigio 1" class="life-sprite" id="p1-life-1">
+                            <img src="/assets/sprites/Vida.png" alt="Prestigio 2" class="life-sprite" id="p1-life-2">
+                            <img src="/assets/sprites/Vida.png" alt="Prestigio 3" class="life-sprite" id="p1-life-3">
+                        </div>
+                    </div>
+
+                    <!-- Escenario del Personaje (Mirando a la Derecha) -->
+                    <div class="character-stage">
+                        <div class="character-wrapper p1-character" id="p1-character">
+                            <div class="character-reaction-badge" id="p1-reaction"></div>
+                            <div class="character-sprite" id="p1-character-sprite"></div>
+                            <div class="character-shadow"></div>
+                        </div>
+                    </div>
+
+                    <!-- Tablero 3x3 con Overlays y Capas Integradas -->
+                    <div class="grid-board-wrapper">
+                        <div class="grid-relative-box" id="p1-grid-container">
+                            <!-- Cuadrícula 3x3 de Casillas -->
+                            <div class="grid-3x3" id="p1-grid">
+                                <button class="casilla-btn" data-key="q" data-row="0" data-col="0" data-player="p1">
+                                    <span class="key-tag">Q</span>
+                                    <span class="pawn-reveal-marker"></span>
+                                </button>
+                                <button class="casilla-btn" data-key="w" data-row="0" data-col="1" data-player="p1">
+                                    <span class="key-tag">W</span>
+                                    <span class="pawn-reveal-marker"></span>
+                                </button>
+                                <button class="casilla-btn" data-key="e" data-row="0" data-col="2" data-player="p1">
+                                    <span class="key-tag">E</span>
+                                    <span class="pawn-reveal-marker"></span>
+                                </button>
+                                <button class="casilla-btn" data-key="a" data-row="1" data-col="0" data-player="p1">
+                                    <span class="key-tag">A</span>
+                                    <span class="pawn-reveal-marker"></span>
+                                </button>
+                                <button class="casilla-btn" data-key="s" data-row="1" data-col="1" data-player="p1">
+                                    <span class="key-tag">S</span>
+                                    <span class="pawn-reveal-marker"></span>
+                                </button>
+                                <button class="casilla-btn" data-key="d" data-row="1" data-col="2" data-player="p1">
+                                    <span class="key-tag">D</span>
+                                    <span class="pawn-reveal-marker"></span>
+                                </button>
+                                <button class="casilla-btn" data-key="z" data-row="2" data-col="0" data-player="p1">
+                                    <span class="key-tag">Z</span>
+                                    <span class="pawn-reveal-marker"></span>
+                                </button>
+                                <button class="casilla-btn" data-key="x" data-row="2" data-col="1" data-player="p1">
+                                    <span class="key-tag">X</span>
+                                    <span class="pawn-reveal-marker"></span>
+                                </button>
+                                <button class="casilla-btn" data-key="c" data-row="2" data-col="2" data-player="p1">
+                                    <span class="key-tag">C</span>
+                                    <span class="pawn-reveal-marker"></span>
+                                </button>
+                            </div>
+
+                            <!-- DADO Y FORMA DE ATAQUE (se queda debajo del tablero) -->
+                            <div class="board-roll-overlay" id="p1-roll-overlay">
+                                <div class="roll-overlay-box">
+                                    <div class="roll-number-badge">
+                                        <img src="/assets/sprites/Dado_spr_1.png" alt="Dado" class="roll-dice-sprite"
+                                            id="p1-roll-dice-img">
+                                    </div>
+                                    <div class="roll-shape-badge">
+                                        <img src="/assets/sprites/attack1.png" alt="Ataque" class="roll-shape-sprite"
+                                            id="p1-roll-shape-img">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- CAPA NEGRA SÓLIDA CON OPACIDAD (Y VERDE AL COLOCAR PEÓN) -->
+                            <div class="board-curtain-overlay active-black" id="p1-curtain">
+                                <div class="curtain-content">
+                                    <div class="curtain-icon-wrapper" id="p1-curtain-icon-box">
+                                        <img src="/assets/sprites/pop_ch_face.png" alt="Cara Pop P1" class="curtain-img"
+                                            id="p1-curtain-img">
+                                    </div>
+                                    <div class="curtain-title" id="p1-curtain-title">A LA PISTA</div>
+                                </div>
+                            </div>
+
+                            <!-- CONTADOR 3, 2, 1 EN MEDIO DEL TABLERO (GRANDE, SOLO EL NÚMERO) -->
+                            <div class="board-big-countdown" id="p1-big-countdown">
+                                <span class="countdown-big-num" id="p1-countdown-num">3</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- JUGADOR 2 -->
+                <section class="player-panel" id="player-2-panel">
+                    <div class="player-header">
+                        <span class="player-badge p2-badge">P2</span>
+                        <div class="player-lives" id="p2-lives" title="Prestigio Jugador 2">
+                            <img src="/assets/sprites/Vida.png" alt="Prestigio 1" class="life-sprite" id="p2-life-1">
+                            <img src="/assets/sprites/Vida.png" alt="Prestigio 2" class="life-sprite" id="p2-life-2">
+                            <img src="/assets/sprites/Vida.png" alt="Prestigio 3" class="life-sprite" id="p2-life-3">
+                        </div>
+                    </div>
+
+                    <!-- Escenario del Personaje (Mirando a la Izquierda) -->
+                    <div class="character-stage">
+                        <div class="character-wrapper p2-character" id="p2-character">
+                            <div class="character-reaction-badge" id="p2-reaction"></div>
+                            <div class="character-sprite" id="p2-character-sprite"></div>
+                            <div class="character-shadow"></div>
+                        </div>
+                    </div>
+
+                    <!-- Tablero 3x3 con Overlays y Capas Integradas -->
+                    <div class="grid-board-wrapper">
+                        <div class="grid-relative-box" id="p2-grid-container">
+                            <!-- Cuadrícula 3x3 de Casillas -->
+                            <div class="grid-3x3" id="p2-grid">
+                                <button class="casilla-btn" data-key="u" data-row="0" data-col="0" data-player="p2">
+                                    <span class="key-tag">U</span>
+                                    <span class="pawn-reveal-marker"></span>
+                                </button>
+                                <button class="casilla-btn" data-key="i" data-row="0" data-col="1" data-player="p2">
+                                    <span class="key-tag">I</span>
+                                    <span class="pawn-reveal-marker"></span>
+                                </button>
+                                <button class="casilla-btn" data-key="o" data-row="0" data-col="2" data-player="p2">
+                                    <span class="key-tag">O</span>
+                                    <span class="pawn-reveal-marker"></span>
+                                </button>
+                                <button class="casilla-btn" data-key="j" data-row="1" data-col="0" data-player="p2">
+                                    <span class="key-tag">J</span>
+                                    <span class="pawn-reveal-marker"></span>
+                                </button>
+                                <button class="casilla-btn" data-key="k" data-row="1" data-col="1" data-player="p2">
+                                    <span class="key-tag">K</span>
+                                    <span class="pawn-reveal-marker"></span>
+                                </button>
+                                <button class="casilla-btn" data-key="l" data-row="1" data-col="2" data-player="p2">
+                                    <span class="key-tag">L</span>
+                                    <span class="pawn-reveal-marker"></span>
+                                </button>
+                                <button class="casilla-btn" data-key="m" data-row="2" data-col="0" data-player="p2">
+                                    <span class="key-tag">M</span>
+                                    <span class="pawn-reveal-marker"></span>
+                                </button>
+                                <button class="casilla-btn" data-key="," data-row="2" data-col="1" data-player="p2">
+                                    <span class="key-tag">,</span>
+                                    <span class="pawn-reveal-marker"></span>
+                                </button>
+                                <button class="casilla-btn" data-key="." data-row="2" data-col="2" data-player="p2">
+                                    <span class="key-tag">.</span>
+                                    <span class="pawn-reveal-marker"></span>
+                                </button>
+                            </div>
+
+                            <!-- DADO Y FORMA DE ATAQUE (se queda debajo del tablero) -->
+                            <div class="board-roll-overlay" id="p2-roll-overlay">
+                                <div class="roll-overlay-box">
+                                    <div class="roll-number-badge">
+                                        <img src="/assets/sprites/Dado_spr_1.png" alt="Dado" class="roll-dice-sprite"
+                                            id="p2-roll-dice-img">
+                                    </div>
+                                    <div class="roll-shape-badge">
+                                        <img src="/assets/sprites/attack1.png" alt="Ataque" class="roll-shape-sprite"
+                                            id="p2-roll-shape-img">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- CAPA NEGRA SÓLIDA CON OPACIDAD (Y VERDE AL COLOCAR PEÓN) -->
+                            <div class="board-curtain-overlay active-black" id="p2-curtain">
+                                <div class="curtain-content">
+                                    <div class="curtain-icon-wrapper" id="p2-curtain-icon-box">
+                                        <img src="/assets/sprites/rock_ch_face.png" alt="Cara Rock P2"
+                                            class="curtain-img" id="p2-curtain-img">
+                                    </div>
+                                    <div class="curtain-title" id="p2-curtain-title">A LA PISTA</div>
+                                </div>
+                            </div>
+
+                            <!-- CONTADOR 3, 2, 1 EN MEDIO DEL TABLERO (GRANDE, SOLO EL NÚMERO) -->
+                            <div class="board-big-countdown" id="p2-big-countdown">
+                                <span class="countdown-big-num" id="p2-countdown-num">3</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- ================= PANTALLA 3: FIN DE PARTIDA ================= -->
+    <div class="game-screen" id="screen-gameover">
+        <div class="screen-card gameover-card">
+            <h2 class="gameover-title" id="go-title">FIN DE LA SESION</h2>
+            <div class="gameover-winner-badge" id="go-winner-badge">EL POP CONQUISTA LAS PLAYLISTS</div>
+
+            <div class="gameover-hero-box" id="go-hero-box">
+                <div class="winner-face-wrapper" id="go-face-wrapper">
+                    <img src="/assets/sprites/pop_ch_face.png" alt="Ganador" class="go-winner-face" id="go-winner-img">
+                </div>
+                <p class="gameover-flavor" id="go-flavor">Los ritmos pegadizos y la estetica pop dominan las listas y la
+                    escena urbana.</p>
+            </div>
+
+            <div class="gameover-actions-box">
+                <button class="arcade-main-btn" id="btn-restart-game">
+                    <span class="btn-text">REINICIAR PARTIDA</span>
+                </button>
+                <button class="arcade-secondary-btn" id="btn-menu-game">
+                    <span class="btn-text">MENU PRINCIPAL</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Librerías locales de SFX -->
+    <script src="/assets/audio/riffwave.js"></script>
+    <script src="/assets/audio/sfxr.js"></script>
+    <!-- Entrada principal de la aplicación -->
+    <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>
