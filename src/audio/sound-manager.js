@@ -15,7 +15,8 @@ const AUDIO_CONFIG = {
       go: 0.90
     },
     diceRoll: 1.0,
-    gameOver: 0.8
+    gameOver: 0.8,
+    gridIntro: 0.5
   }
 };
 
@@ -23,6 +24,7 @@ const HIT_SFXR_CODE = "11111J2LXvFsbav3ZioKnEjgoR8M48MxVeS4qfPZEEEEughZBZtidcoSA
 const PAWN_SFXR_CODE = "4DXe5v4QcA8vJsXLTfqstjrahiqa4nvmrntpdMbcpEibL3acpcn17nptrRgmYZc2aHksRhWDDCfP8vt3xDTuXJhKFJYL3zs3391rvDNHzYTnMqCpYFgxXm5aP";
 const MISS_BOTH_SFXR_CODE = "111116x8fB2q9mYrADpaPCAYmb1pCrd7buucZHdE4oTEakAC9hgkwLWzY7m6fvbq8qbSFqPd7xY61cW3NTk8YxGhnD3nCFkHn11esahFhpGQRbTVmPFUadg3";
 const GAME_OVER_SFXR_CODE = "12sF8HRL5TadVgapRXoxxWeud1GgnJ43YAUMHugAapxapTPMbLSp4SAjDoS6YRpJSRrCv8ruAvW4svvAummf37Q5zzqPAQn72FWrtNmqafyUu6C1PoC94D76Bv";
+const GAME_START_ANIMATION_CODE = "34T6PkuprVUgR5ikjjDzeXVUvgWsybHfTjcgSMeoaNJwkn7o1RwpRwBtg1yTwaftyD5hSC32cvshymndpx3BnTKvPKFxGYueVfUDnFC7kBeGA5miw1sWA922s";
 
 const COUNTDOWN_SFXR = {
   3: "11111GneoSLWuDVAHov7b7xBKUdw4EigursMKfYVSF7b6cKptCHm5LCrTyFNYNJ6Yt7W9jcT79tXcdLAZmKmsib5RUn1xLvqWCXYtuqytqopx2AKBKPe94Ws",
@@ -182,6 +184,10 @@ class SoundManager {
 
   playGameOverSound() {
     this.playSFX(GAME_OVER_SFXR_CODE, AUDIO_CONFIG.volumes.gameOver);
+  }
+
+  playGridIntroSound() {
+    this.playSFX(GAME_START_ANIMATION_CODE, AUDIO_CONFIG.volumes.gridIntro);
   }
 
   playCountdownSound(step) {

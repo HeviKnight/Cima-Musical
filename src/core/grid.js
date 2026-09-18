@@ -69,15 +69,15 @@ export function evaluateCellStates(targetedCells, pawnCell, gridSize = 3) {
       const isTargeted = safeTargeted.some(t => t.row === r && t.col === c);
       const isPawn = Boolean(pawnCell && pawnCell.row === r && pawnCell.col === c);
 
-      let state = 'empty';
+      let state = 'off';
       if (isTargeted && isPawn) {
         state = 'hit';
       } else if (isTargeted && !isPawn) {
-        state = 'fail';
+        state = 'miss';
       } else if (!isTargeted && isPawn) {
-        state = 'dodge';
+        state = 'player';
       } else {
-        state = 'empty';
+        state = 'off';
       }
 
       rowList.push({ row: r, col: c, state });
@@ -86,4 +86,17 @@ export function evaluateCellStates(targetedCells, pawnCell, gridSize = 3) {
   }
 
   return result;
+}
+
+/**
+ * Comprueba si dos casillas son adyacentes (ortogonal o diagonalmente).
+ * @param {{row: number, col: number}|null} cellA 
+ * @param {{row: number, col: number}|null} cellB 
+ * @returns {boolean}
+ */
+export function isAdjacentCell(cellA, cellB) {
+  if (!cellA || !cellB) return true;
+  const rowDiff = Math.abs(cellA.row - cellB.row);
+  const colDiff = Math.abs(cellA.col - cellB.col);
+  return rowDiff <= 1 && colDiff <= 1;
 }
