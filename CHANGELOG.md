@@ -1,7 +1,8 @@
-# 📝 Notas del Parche — Versión 0.1.2 (Commit `f37dc30`)
+# 📝 Notas del Parche — Versión 0.1.3
 
 ## 🚀 Resumen del Lanzamiento
-Esta actualización introduce mejoras fundamentales en la jugabilidad, mecánicas de control, comportamiento de la Inteligencia Artificial, animaciones pixel art y la estructuración del sistema de pantallas y estados de fin de juego.
+Esta actualización introduce la documentación completa del juego (`README.md`), ajustes en el sistema de control, refinamiento de estados de juego y actualización de la documentación de versión.
+
 
 ---
 
