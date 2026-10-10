@@ -1,17 +1,27 @@
-# 🎵 Cima Musical
+# 🤖 Cima Musical / Robot Dystopia
 
-¡Bienvenido a **Cima Musical**! Un juego táctico arcade en 2D desarrollado con JavaScript y Vite donde dos estilos musicales (Pop vs Rock) compiten por alcanzar la cima de las listas de éxito.
+¡Bienvenido a **Cima Musical**! Un juego táctico arcade en 2D desarrollado con JavaScript y Vite ambientado en una distopía robótica donde facciones cibernéticas y autómatas compiten en combates de ritmo y posicionamiento táctico.
 
 ---
 
 ## 🎮 Descripción del Juego
 
-En **Cima Musical**, los jugadores se enfrentan en una arena en cuadrícula de 3x3. Cada ronda se divide en dos fases tácticas:
+En **Cima Musical**, los jugadores eligen su robot/cyborg y se enfrentan en una arena en cuadrícula de 3x3. Cada ronda se divide en dos fases tácticas:
 
 1. **Fase de Colocación (Posicionamiento)**: Selecciona una casilla adyacente a tu posición actual para prepararte. Si expira el tiempo sin elegir, tu personaje permanecerá en su casilla actual.
-2. **Fase de Baile (Ataque)**: Elige la casilla del tablero enemigo a la que lanzar tu ataque o ritmo.
+2. **Fase de Combate / Ataque**: Elige la casilla del tablero enemigo a la que lanzar tu ataque cibernético.
 
-El primer jugador en alcanzar **100 puntos de prestigio** o derrotar a su oponente se coronará en la cima de las listas.
+El primer jugador en alcanzar la meta de tensión/prestigio o derrotar a su oponente se coronará en la cima.
+
+---
+
+## 🤖 Roster de Personajes
+
+El juego cuenta con un elenco de 6 androides y cyborgs con estilos de juego, habilidades activas/pasivas y niveles de dificultad propios:
+- **CYBORG**: Equilibrado (Habilidad activa: *Biocarga*, Pasiva: *Melodía del Pueblo*).
+- **INCINERADOR**: Ofensivo.
+- **SWARM DRONE**: Control y ráfagas.
+- **HOLO, DRILL, ROBO-HAND**: Máquinas con patrones y mecánicas de combate únicas.
 
 ---
 
@@ -24,13 +34,13 @@ El primer jugador en alcanzar **100 puntos de prestigio** o derrotar a su oponen
 
 ## 🎹 Controles
 
-### Jugador 1 (Pop)
+### Jugador 1
 - **Teclado (Cuadrícula 3x3)**:
   - Fila Superior: `Q` | `W` | `E`
   - Fila Media: `A` | `S` | `D`
   - Fila Inferior: `Z` | `X` | `C`
 
-### Jugador 2 (Rock)
+### Jugador 2
 - **Teclado (Cuadrícula 3x3)**:
   - Fila Superior: `U` | `I` | `O`
   - Fila Media: `J` | `K` | `L`
@@ -42,7 +52,7 @@ El primer jugador en alcanzar **100 puntos de prestigio** o derrotar a su oponen
 
 - **JavaScript (ES Modules)**
 - **Vite** (Bundler & Dev Server)
-- **HTML5 & Vanilla CSS3** (Estética Pixel Art / Retrogaming, animaciones custom)
+- **HTML5 & Vanilla CSS3** (Estética Pixel Art Cyberpunk/Retrogaming, animaciones custom)
 
 ---
 
