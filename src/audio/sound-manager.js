@@ -33,18 +33,24 @@ const COUNTDOWN_SFXR = {
   go: "11111GneoSLWuDVACs4kWLQ21DBFM5dQTa9rtmeES73PPjVft8S1fn8jpFoYyJ4e7K2dJthWnHo7TuPW6VNKHhNYfW82sNGcswJnw1Ruc9csTAbWLNo6uYMm"
 };
 
+export const MUSIC_TRACKS = {
+  INICIO: '/assets/audio/Melody_Inicio.mp3',
+  POP: '/assets/audio/Melody_Pop.mp3',
+  ROCK: '/assets/audio/Melody_Rock.mp3'
+};
+
 class SoundManager {
   constructor() {
     this.audioCtx = null;
-    this.musicBuffer = null;
+    this.audioBuffers = new Map(); // url -> AudioBuffer
+    this.rawBuffers = new Map();   // url -> ArrayBuffer
     this.musicSource = null;
     this.musicGain = null;
     this.musicStarted = false;
-    this.musicLoading = false;
-    this.rawMusicArrayBuffer = null;
+    this.currentTrackUrl = MUSIC_TRACKS.INICIO;
     this.fallbackAudio = null;
 
-    this._preFetchMusic();
+    this._preFetchAllMusic();
   }
 
   getAudioContext() {
@@ -60,54 +66,86 @@ class SoundManager {
     return this.audioCtx;
   }
 
-  _preFetchMusic() {
-    fetch('/assets/audio/music.mp3')
-      .then(r => r.arrayBuffer())
-      .then(buf => {
-        this.rawMusicArrayBuffer = buf;
-      })
-      .catch(() => { });
+  _preFetchAllMusic() {
+    Object.values(MUSIC_TRACKS).forEach(url => {
+      fetch(url)
+        .then(r => r.arrayBuffer())
+        .then(buf => {
+          this.rawBuffers.set(url, buf);
+        })
+        .catch(() => {});
+    });
   }
 
-  async loadBackgroundMusic() {
-    if (this.musicBuffer || this.musicLoading) return;
-    this.musicLoading = true;
+  async _decodeTrack(url) {
+    if (this.audioBuffers.has(url)) {
+      return this.audioBuffers.get(url);
+    }
+    const ctx = this.getAudioContext();
+    if (!ctx) return null;
 
-    try {
-      const ctx = this.getAudioContext();
-      if (!ctx) return;
+    let arrayBuffer = this.rawBuffers.get(url);
+    if (!arrayBuffer) {
+      const response = await fetch(url);
+      arrayBuffer = await response.arrayBuffer();
+      this.rawBuffers.set(url, arrayBuffer);
+    }
 
-      if (!this.rawMusicArrayBuffer) {
-        const response = await fetch('/assets/audio/music.mp3');
-        this.rawMusicArrayBuffer = await response.arrayBuffer();
-      }
+    const decoded = await ctx.decodeAudioData(arrayBuffer.slice(0));
+    this.audioBuffers.set(url, decoded);
+    return decoded;
+  }
 
-      this.musicBuffer = await ctx.decodeAudioData(this.rawMusicArrayBuffer.slice(0));
-      this.musicLoading = false;
-
-      if (this.musicStarted && !this.musicSource) {
-        this._playWebAudioMusic();
-      }
-    } catch (err) {
-      console.warn('Error decodificando música con Web Audio API, usando fallback:', err);
-      this.musicLoading = false;
-      if (this.musicStarted) {
-        this._playFallbackMusic();
-      }
+  _stopCurrentMusic() {
+    if (this.musicSource) {
+      try {
+        this.musicSource.stop();
+        this.musicSource.disconnect();
+      } catch (e) {}
+      this.musicSource = null;
+    }
+    if (this.fallbackAudio) {
+      try {
+        this.fallbackAudio.pause();
+      } catch (e) {}
+      this.fallbackAudio = null;
     }
   }
 
-  _playWebAudioMusic() {
-    if (!this.musicBuffer) return;
+  async playTrack(url) {
+    if (this.currentTrackUrl === url && (this.musicSource || this.fallbackAudio) && this.musicStarted) {
+      return;
+    }
+
+    this.currentTrackUrl = url;
+
+    if (!this.musicStarted) return;
+
+    this._stopCurrentMusic();
+
+    try {
+      const buffer = await this._decodeTrack(url);
+      if (this.currentTrackUrl !== url) return;
+
+      if (buffer) {
+        this._playWebAudioBuffer(buffer);
+      } else {
+        this._playFallbackMusic(url);
+      }
+    } catch (err) {
+      console.warn('Error decodificando pista de música con Web Audio API, usando fallback:', err);
+      this._playFallbackMusic(url);
+    }
+  }
+
+  _playWebAudioBuffer(buffer) {
     const ctx = this.getAudioContext();
     if (!ctx) return;
 
-    if (this.musicSource) {
-      try { this.musicSource.stop(); } catch (e) { }
-    }
+    this._stopCurrentMusic();
 
     this.musicSource = ctx.createBufferSource();
-    this.musicSource.buffer = this.musicBuffer;
+    this.musicSource.buffer = buffer;
     this.musicSource.loop = true;
 
     if (!this.musicGain) {
@@ -120,33 +158,32 @@ class SoundManager {
     this.musicSource.start(0);
   }
 
-  _playFallbackMusic() {
-    if (!this.fallbackAudio) {
-      this.fallbackAudio = new Audio('/assets/audio/music.mp3');
-      this.fallbackAudio.loop = true;
-      this.fallbackAudio.volume = 0.85;
-    }
-    this.fallbackAudio.play().catch(() => { });
+  _playFallbackMusic(url) {
+    this._stopCurrentMusic();
+    this.fallbackAudio = new Audio(url);
+    this.fallbackAudio.loop = true;
+    this.fallbackAudio.volume = 0.85;
+    this.fallbackAudio.play().catch(() => {});
   }
 
-  startBackgroundMusic() {
+  startBackgroundMusic(url = null) {
     const ctx = this.getAudioContext();
     if (ctx && ctx.state === 'suspended') {
       ctx.resume();
     }
 
-    if (this.musicStarted) return;
+    const targetUrl = url || this.currentTrackUrl || MUSIC_TRACKS.INICIO;
     this.musicStarted = true;
+    this.playTrack(targetUrl);
+  }
 
-    if (this.musicBuffer) {
-      this._playWebAudioMusic();
-    } else {
-      this.loadBackgroundMusic().then(() => {
-        if (this.musicBuffer && !this.musicSource) {
-          this._playWebAudioMusic();
-        }
-      });
-    }
+  playMenuMusic() {
+    this.playTrack(MUSIC_TRACKS.INICIO);
+  }
+
+  playRoundMusic(roundNumber) {
+    const track = (roundNumber % 2 === 1) ? MUSIC_TRACKS.POP : MUSIC_TRACKS.ROCK;
+    this.playTrack(track);
   }
 
   playSFX(code, volumeLevel = 1.0) {

@@ -12,27 +12,75 @@
  */
 export function calculateAttackArea(attackTypeId, anchorRow, anchorCol, gridSize = 3) {
   const affected = [];
+  const typeStr = String(attackTypeId);
 
-  if (attackTypeId === 1) {
-    // 1 Casilla exacta
+  if (typeStr === '1' || typeStr === 'SINGLE_SHOT') {
     affected.push({ row: anchorRow, col: anchorCol });
-  } else if (attackTypeId === 2) {
-    // Cuadrante 2x2 ajustado a los bordes
+  } else if (typeStr === '2' || typeStr === 'COLUMN_SHOOT') {
+    // 2 casillas en columna
+    affected.push({ row: anchorRow, col: anchorCol });
+    if (anchorRow < gridSize - 1) {
+      affected.push({ row: anchorRow + 1, col: anchorCol });
+    } else {
+      affected.push({ row: anchorRow - 1, col: anchorCol });
+    }
+  } else if (typeStr === '3_L' || typeStr === 'L_SHOOT') {
+    // 3 casillas en forma de L
+    affected.push({ row: anchorRow, col: anchorCol });
+    const r1 = anchorRow < gridSize - 1 ? anchorRow + 1 : anchorRow - 1;
+    const c1 = anchorCol < gridSize - 1 ? anchorCol + 1 : anchorCol - 1;
+    affected.push({ row: r1, col: anchorCol });
+    affected.push({ row: anchorRow, col: c1 });
+  } else if (typeStr === '3_LONG' || typeStr === 'LONG_COLUMN' || typeStr === '3') {
+    // 3 casillas: Columna completa
+    for (let r = 0; r < gridSize; r++) {
+      affected.push({ row: r, col: anchorCol });
+    }
+  } else if (typeStr === '4' || typeStr === 'SQUARE_STOMP') {
+    // Cuadrante 2x2
     const maxIndex = gridSize - 2;
     const startRow = anchorRow > maxIndex ? maxIndex : anchorRow;
     const startCol = anchorCol > maxIndex ? maxIndex : anchorCol;
-
     affected.push({ row: startRow, col: startCol });
     affected.push({ row: startRow, col: startCol + 1 });
     affected.push({ row: startRow + 1, col: startCol });
     affected.push({ row: startRow + 1, col: startCol + 1 });
-  } else if (attackTypeId === 3) {
-    // Todas las casillas del tablero
+  } else if (typeStr === '5_CROSS' || typeStr === 'CROSS_SLASH' || typeStr === '5') {
+    // 5 casillas en cruz (+)
+    affected.push({ row: anchorRow, col: anchorCol });
+    [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dr, dc]) => {
+      const r = anchorRow + dr;
+      const c = anchorCol + dc;
+      if (r >= 0 && r < gridSize && c >= 0 && c < gridSize) {
+        affected.push({ row: r, col: c });
+      }
+    });
+  } else if (typeStr === '5_XBOW' || typeStr === 'X_BOW_SHOOT') {
+    // 5 casillas en X (diagonales)
+    affected.push({ row: anchorRow, col: anchorCol });
+    [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(([dr, dc]) => {
+      const r = anchorRow + dr;
+      const c = anchorCol + dc;
+      if (r >= 0 && r < gridSize && c >= 0 && c < gridSize) {
+        affected.push({ row: r, col: c });
+      }
+    });
+  } else if (typeStr === '5_WAVE' || typeStr === 'WAVE_CRASH') {
+    // 6 casillas (2 columnas adyacentes)
+    const c1 = anchorCol < gridSize - 1 ? anchorCol : anchorCol - 1;
+    for (let r = 0; r < gridSize; r++) {
+      affected.push({ row: r, col: c1 });
+      affected.push({ row: r, col: c1 + 1 });
+    }
+  } else if (typeStr === '6' || typeStr === 'FULL_ATTACK') {
+    // 9 casillas (todas)
     for (let r = 0; r < gridSize; r++) {
       for (let c = 0; c < gridSize; c++) {
         affected.push({ row: r, col: c });
       }
     }
+  } else {
+    affected.push({ row: anchorRow, col: anchorCol });
   }
 
   return affected;

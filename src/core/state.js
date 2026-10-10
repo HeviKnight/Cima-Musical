@@ -28,6 +28,9 @@ export class GameState {
   _createPlayerState(playerKey) {
     const centerKey = playerKey === 'p2' ? 'k' : 's';
     return {
+      character: null,      // Objeto CHARACTERS
+      maxAbilityCharges: 1, // Cargas totales según personaje (placeholder: 1)
+      activeAbilityCharges: 1, // Cargas de habilidad disponibles por partida
       prestige: 0,          // 0 a 100 puntos
       pawnCell: null,       // { row, col, key }
       lastPawnCell: { row: 1, col: 1, key: centerKey },   // Posición inicial en el centro (1,1)
@@ -79,6 +82,12 @@ export class GameState {
     this.roundNumber = 0;
     this.p1.prestige = 0;
     this.p2.prestige = 0;
+    const p1Max = this.p1.character?.activeAbility?.maxCharges ?? 1;
+    const p2Max = this.p2.character?.activeAbility?.maxCharges ?? 1;
+    this.p1.maxAbilityCharges = p1Max;
+    this.p2.maxAbilityCharges = p2Max;
+    this.p1.activeAbilityCharges = p1Max;
+    this.p2.activeAbilityCharges = p2Max;
     this.p1.pawnCell = null;
     this.p2.pawnCell = null;
     this.p1.lastPawnCell = { row: 1, col: 1, key: 's' };

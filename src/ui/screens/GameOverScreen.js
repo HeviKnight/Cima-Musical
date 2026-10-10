@@ -9,14 +9,12 @@ export function renderGameOverScreen() {
 
   container.innerHTML = `
     <div class="screen-card gameover-card">
-        <h2 class="gameover-title" id="go-title">FIN DE LA SESION</h2>
-        <div class="gameover-winner-badge" id="go-winner-badge">EL POP CONQUISTA LAS PLAYLISTS</div>
+        <h2 class="gameover-title" id="go-title">FIN DE LA SESIÓN</h2>
+        <div class="gameover-winner-badge" id="go-winner-badge"></div>
 
         <div class="gameover-hero-box" id="go-hero-box">
-            <div class="winner-face-wrapper" id="go-face-wrapper">
-                <img src="/assets/sprites/pop_ch_face.png" alt="Ganador" class="go-winner-face" id="go-winner-img">
-            </div>
-            <p class="gameover-flavor" id="go-flavor">Los ritmos pegadizos y la estetica pop dominan las listas y la escena urbana.</p>
+            <div class="winner-face-wrapper" id="go-face-wrapper"></div>
+            <p class="gameover-flavor" id="go-flavor"></p>
         </div>
 
         <div class="gameover-actions-box">
@@ -24,7 +22,7 @@ export function renderGameOverScreen() {
                 <span class="btn-text">REINICIAR PARTIDA</span>
             </button>
             <button class="arcade-secondary-btn" id="btn-menu-game">
-                <span class="btn-text">MENU PRINCIPAL</span>
+                <span class="btn-text">MENÚ PRINCIPAL</span>
             </button>
         </div>
     </div>

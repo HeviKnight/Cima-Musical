@@ -2,7 +2,8 @@
 // GESTOR DE FEEDBACK VISUAL Y CLASES DOM (UI)
 // ===================================================
 
-import { TRIBES } from '../data/tribes.js';
+import { CONTROLS } from '../data/controls.js';
+import { gameState } from '../core/state.js';
 import { soundManager } from '../audio/sound-manager.js';
 
 class FeedbackManager {
@@ -16,8 +17,6 @@ class FeedbackManager {
     this.p2CurtainImg = null;
     this.p1CurtainTitle = null;
     this.p2CurtainTitle = null;
-    this.p1CurtainSub = null;
-    this.p2CurtainSub = null;
 
     // Contadores gigantes
     this.p1BigCountdown = null;
@@ -54,10 +53,12 @@ class FeedbackManager {
     this.p1CurtainTitle = document.getElementById('p1-curtain-title');
     this.p2CurtainTitle = document.getElementById('p2-curtain-title');
 
-    this.p1BigCountdown = document.getElementById('p1-big-countdown');
-    this.p2BigCountdown = document.getElementById('p2-big-countdown');
-    this.p1CountdownNum = document.getElementById('p1-countdown-num');
-    this.p2CountdownNum = document.getElementById('p2-countdown-num');
+    this.sharedBigCountdown = document.getElementById('shared-big-countdown');
+    this.sharedCountdownNum = document.getElementById('shared-countdown-num');
+    this.p1BigCountdown = this.sharedBigCountdown || document.getElementById('p1-big-countdown');
+    this.p2BigCountdown = this.sharedBigCountdown || document.getElementById('p2-big-countdown');
+    this.p1CountdownNum = this.sharedCountdownNum || document.getElementById('p1-countdown-num');
+    this.p2CountdownNum = this.sharedCountdownNum || document.getElementById('p2-countdown-num');
 
     this.p1RollOverlay = document.getElementById('p1-roll-overlay');
     this.p2RollOverlay = document.getElementById('p2-roll-overlay');
@@ -70,6 +71,39 @@ class FeedbackManager {
     this.p2Character = document.getElementById('p2-character');
     this.p1Reaction = document.getElementById('p1-reaction');
     this.p2Reaction = document.getElementById('p2-reaction');
+
+    this.updateAssaultChargesUI('both');
+  }
+
+  updateAssaultChargesUI(player = 'both') {
+    const targets = player === 'both' ? ['p1', 'p2'] : [player];
+    targets.forEach(p => {
+      const container = document.getElementById(`${p}-charges-slots`);
+      if (!container) return;
+
+      const pState = gameState[p];
+      const maxCharges = pState?.maxAbilityCharges ?? (pState?.character?.activeAbility?.maxCharges ?? 1);
+      const currentCharges = pState?.activeAbilityCharges ?? maxCharges;
+
+      container.innerHTML = '';
+      for (let i = 0; i < maxCharges; i++) {
+        const slot = document.createElement('div');
+        const isAvailable = i < currentCharges;
+        slot.className = `charge-slot ${isAvailable ? 'active' : 'used'}`;
+        slot.title = isAvailable ? `Carga ${i + 1} Disponible` : `Carga ${i + 1} Usada`;
+
+        if (isAvailable) {
+          slot.innerHTML = `<span class="charge-icon">⚡</span>`;
+        } else {
+          slot.innerHTML = `<span class="charge-used-sq"></span>`;
+        }
+        container.appendChild(slot);
+      }
+    });
+  }
+
+  updateAbilityChargesUI(player = 'both') {
+    this.updateAssaultChargesUI(player);
   }
 
   playGridIntroAnimation(onComplete) {
@@ -136,7 +170,8 @@ class FeedbackManager {
 
       let finalIcon = iconSrc;
       if (!finalIcon || finalIcon === 'face' || finalIcon === 'default') {
-        finalIcon = TRIBES[p].faceSprite;
+        const activeChar = gameState[p]?.character || CONTROLS[p];
+        finalIcon = activeChar?.iconSprite || activeChar?.faceSprite;
       }
 
       if (mode === 'hide') {
@@ -158,7 +193,7 @@ class FeedbackManager {
   }
 
   removeStandingPawnIcons() {
-    document.querySelectorAll('.standing-pawn-face').forEach(img => img.remove());
+    document.querySelectorAll('.standing-pawn-face, .standing-pawn-square').forEach(el => el.remove());
     document.querySelectorAll('.casilla-btn').forEach(btn => btn.classList.remove('state-player'));
   }
 
@@ -170,24 +205,50 @@ class FeedbackManager {
     const p1Cell = p1LastCell || { row: 1, col: 1 };
     const p2Cell = p2LastCell || { row: 1, col: 1 };
 
+    const p1Char = gameState.p1?.character || CONTROLS.p1;
+    const p2Char = gameState.p2?.character || CONTROLS.p2;
+
+    const p1Icon = p1Char.iconSprite || p1Char.faceSprite;
+    const p2Icon = p2Char.iconSprite || p2Char.faceSprite;
+
     if (p1Matrix[p1Cell.row] && p1Matrix[p1Cell.row][p1Cell.col]) {
       const btn = p1Matrix[p1Cell.row][p1Cell.col].btn;
       btn.classList.add('state-player');
-      const img = document.createElement('img');
-      img.src = TRIBES.p1.faceSprite;
-      img.alt = 'P1 Standing';
-      img.className = 'standing-pawn-face';
-      btn.appendChild(img);
+
+      if (p1Icon) {
+        const img = document.createElement('img');
+        img.src = p1Icon;
+        img.alt = 'P1 Standing';
+        img.className = 'standing-pawn-face';
+        btn.appendChild(img);
+      } else {
+        const sq = document.createElement('div');
+        sq.className = 'standing-pawn-square';
+        sq.style.background = p1Char.color || '#22D3EE';
+        sq.style.borderColor = p1Char.borderColor || '#7C3AED';
+        sq.textContent = (p1Char.name || 'P1')[0];
+        btn.appendChild(sq);
+      }
     }
 
     if (p2Matrix[p2Cell.row] && p2Matrix[p2Cell.row][p2Cell.col]) {
       const btn = p2Matrix[p2Cell.row][p2Cell.col].btn;
       btn.classList.add('state-player');
-      const img = document.createElement('img');
-      img.src = TRIBES.p2.faceSprite;
-      img.alt = 'P2 Standing';
-      img.className = 'standing-pawn-face';
-      btn.appendChild(img);
+
+      if (p2Icon) {
+        const img = document.createElement('img');
+        img.src = p2Icon;
+        img.alt = 'P2 Standing';
+        img.className = 'standing-pawn-face';
+        btn.appendChild(img);
+      } else {
+        const sq = document.createElement('div');
+        sq.className = 'standing-pawn-square';
+        sq.style.background = p2Char.color || '#FF6F59';
+        sq.style.borderColor = p2Char.borderColor || '#EF233C';
+        sq.textContent = (p2Char.name || 'P2')[0];
+        btn.appendChild(sq);
+      }
     }
   }
 
@@ -242,22 +303,27 @@ class FeedbackManager {
   }
 
   showBigCountdown(num) {
-    if (this.p1BigCountdown) this.p1BigCountdown.classList.add('show');
-    if (this.p2BigCountdown) this.p2BigCountdown.classList.add('show');
+    if (this.sharedBigCountdown) this.sharedBigCountdown.classList.add('show');
+    if (this.p1BigCountdown && this.p1BigCountdown !== this.sharedBigCountdown) this.p1BigCountdown.classList.add('show');
+    if (this.p2BigCountdown && this.p2BigCountdown !== this.sharedBigCountdown) this.p2BigCountdown.classList.add('show');
 
+    if (this.sharedCountdownNum) this.sharedCountdownNum.textContent = num;
     if (this.p1CountdownNum) this.p1CountdownNum.textContent = num;
     if (this.p2CountdownNum) this.p2CountdownNum.textContent = num;
 
+    if (this.sharedCountdownNum) this.sharedCountdownNum.classList.add('tick-anim');
     if (this.p1CountdownNum) this.p1CountdownNum.classList.add('tick-anim');
     if (this.p2CountdownNum) this.p2CountdownNum.classList.add('tick-anim');
 
     setTimeout(() => {
+      if (this.sharedCountdownNum) this.sharedCountdownNum.classList.remove('tick-anim');
       if (this.p1CountdownNum) this.p1CountdownNum.classList.remove('tick-anim');
       if (this.p2CountdownNum) this.p2CountdownNum.classList.remove('tick-anim');
     }, 100);
   }
 
   hideBigCountdown() {
+    if (this.sharedBigCountdown) this.sharedBigCountdown.classList.remove('show');
     if (this.p1BigCountdown) this.p1BigCountdown.classList.remove('show');
     if (this.p2BigCountdown) this.p2BigCountdown.classList.remove('show');
   }
@@ -363,6 +429,41 @@ class FeedbackManager {
       badge.textContent = text;
       badge.className = `character-reaction-badge ${cssClass}`;
     }
+  }
+
+  showPlaceholderActivation(player, message = 'placeholder activado') {
+    this.showReactionBadge(player, message, 'show-placeholder');
+
+    const panelId = player === 'p1' ? 'player-1-panel' : 'player-2-panel';
+    const panel = document.getElementById(panelId);
+    if (panel) {
+      panel.querySelectorAll('.placeholder-activation-banner').forEach(el => el.remove());
+      const banner = document.createElement('div');
+      banner.className = 'placeholder-activation-banner';
+      banner.innerHTML = `<span class="placeholder-icon">⚡</span> ${message}`;
+      panel.appendChild(banner);
+
+      setTimeout(() => {
+        banner.classList.add('fade-out');
+        setTimeout(() => banner.remove(), 400);
+      }, 1600);
+    }
+
+    if (!this.placeholderBadgeTimeouts) this.placeholderBadgeTimeouts = {};
+    if (this.placeholderBadgeTimeouts[player]) {
+      clearTimeout(this.placeholderBadgeTimeouts[player]);
+    }
+    this.placeholderBadgeTimeouts[player] = setTimeout(() => {
+      const badge = player === 'p1' ? this.p1Reaction : this.p2Reaction;
+      if (badge && badge.classList.contains('show-placeholder')) {
+        badge.className = 'character-reaction-badge';
+      }
+    }, 2000);
+  }
+
+  hideReactionBadge(player) {
+    const badge = player === 'p1' ? this.p1Reaction : this.p2Reaction;
+    if (badge) badge.className = 'character-reaction-badge';
   }
 
   hideReactionBadges() {
@@ -482,7 +583,7 @@ class FeedbackManager {
     });
   }
 
-  updateRoundUI(roundNum, phaseType = 'pose') {
+  updateRoundUI(roundNum, phaseType = 'placement') {
     const roundValEl = document.getElementById('round-num-val');
     if (roundValEl) {
       if (roundValEl.textContent !== String(roundNum)) {
@@ -492,39 +593,29 @@ class FeedbackManager {
         roundValEl.classList.add('val-pop');
       }
     }
-    const isBaile = phaseType === 'baile';
-    const text = isBaile ? 'BAILE' : 'COLOCAR';
-    this.updateRoundDrawer(text, phaseType);
+
+    let text = 'COLOCAR';
+    let theme = 'placement';
+
+    if (phaseType === 'attack' || phaseType === 'baile' || phaseType === 'resolution') {
+      text = 'ATAQUE';
+      theme = 'attack';
+    } else {
+      text = 'COLOCAR';
+      theme = 'placement';
+    }
+
+    this.updateRoundDrawer(text, theme);
   }
 
-  updateRoundDrawer(text, theme = 'pose') {
+  updateRoundDrawer(text, theme = 'placement') {
     const drawerEl = document.getElementById('round-drawer-badge');
     const textEl = document.getElementById('round-drawer-text');
-    const iconEl = document.getElementById('round-drawer-icon');
 
     if (!drawerEl || !textEl) return;
 
-    if (textEl.textContent === text && !drawerEl.classList.contains('is-folded')) {
-      return;
-    }
-
-    // 1. Plegar hacia la izquierda (contraer dentro del marcador de ronda)
-    drawerEl.classList.add('is-folded');
-
-    // 2. Cambiar contenido y desplegar de nuevo tras completar el pliegue
-    setTimeout(() => {
-      textEl.textContent = text;
-      if (iconEl) iconEl.textContent = icon;
-      drawerEl.className = `round-drawer-badge theme-${theme} is-folded`;
-
-      // Force reflow
-      void drawerEl.offsetWidth;
-      drawerEl.classList.remove('is-folded');
-    }, 280);
-  }
-
-  updateLivesUI(player, lives) {
-    this.updatePrestigeUI(player, lives);
+    textEl.textContent = text;
+    drawerEl.className = `phase-tag-banner phase-${theme}`;
   }
 
   dockDiceOverlays() {
@@ -537,7 +628,18 @@ class FeedbackManager {
     if (this.p2RollOverlay) this.p2RollOverlay.className = 'board-roll-overlay';
   }
 
+  showVerticalCombatBars() {
+    const section = document.querySelector('.vertical-combat-section');
+    if (section) section.classList.add('show');
+  }
+
+  hideVerticalCombatBars() {
+    const section = document.querySelector('.vertical-combat-section');
+    if (section) section.classList.remove('show');
+  }
+
   clearBoardEffects() {
+    this.hideVerticalCombatBars();
     document.querySelectorAll('.casilla-btn').forEach(btn => {
       btn.classList.remove('pawn-revealed', 'state-hit', 'state-miss', 'state-active', 'state-player');
       btn.classList.add('state-off');
