@@ -10,11 +10,11 @@ export const CONTROLS = {
     color: '#8B5CF6',
     colorTextClass: 'p1-color-text',
     borderColor: '#7C3AED',
-    faceSprite: '/assets/sprites/CH_Icon_Cyborg.png',
-    iconSprite: '/assets/sprites/CH_Icon_Cyborg.png',
-    characterSprite: '/assets/sprites/CH_Sprite_Cyborg.png',
-    fullPortrait: '/assets/sprites/CH_Sprite_Cyborg.png',
-    animSprite: '/assets/sprites/CH_Anim_Cyborg.png',
+    faceSprite: '/assets/sprites/heroes/CH_Icon_Cyborg.png',
+    iconSprite: '/assets/sprites/heroes/CH_Icon_Cyborg.png',
+    characterSprite: '/assets/sprites/heroes/CH_Sprite_Cyborg.png',
+    fullPortrait: '/assets/sprites/heroes/CH_Sprite_Cyborg.png',
+    animSprite: '/assets/sprites/heroes/CH_Anim_Cyborg.png',
     melody: '/assets/audio/Melody_Pop.mp3',
     keyList: ['q', 'w', 'e', 'a', 's', 'd', 'z', 'x', 'c'],
     keyMatrix: [
@@ -32,11 +32,11 @@ export const CONTROLS = {
     color: '#EF4444',
     colorTextClass: 'p2-color-text',
     borderColor: '#B91C1C',
-    faceSprite: '/assets/sprites/CH_Icon_Furnance.png',
-    iconSprite: '/assets/sprites/CH_Icon_Furnance.png',
-    characterSprite: '/assets/sprites/CH_Sprite_Furnance.png',
-    fullPortrait: '/assets/sprites/CH_Sprite_Furnance.png',
-    animSprite: '/assets/sprites/CH_Anim_Furnance.png',
+    faceSprite: '/assets/sprites/heroes/CH_Icon_Furnance.png',
+    iconSprite: '/assets/sprites/heroes/CH_Icon_Furnance.png',
+    characterSprite: '/assets/sprites/heroes/CH_Sprite_Furnance.png',
+    fullPortrait: '/assets/sprites/heroes/CH_Sprite_Furnance.png',
+    animSprite: '/assets/sprites/heroes/CH_Anim_Furnance.png',
     melody: '/assets/audio/Melody_Rock.mp3',
     keyList: ['u', 'i', 'o', 'j', 'k', 'l', 'm', ',', '.'],
     keyMatrix: [
@@ -54,5 +54,5 @@ export const DRAW_RESULT = {
   color: '#ffbe0b',
   borderColor: '#ffbe0b',
   flavor: 'Ambos contendientes han agotado su tensión en un duelo histórico.',
-  faceSprite: '/assets/sprites/CH_Icon_Cyborg.png'
+  faceSprite: '/assets/sprites/heroes/CH_Icon_Cyborg.png'
 };

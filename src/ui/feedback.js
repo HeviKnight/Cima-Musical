@@ -3,8 +3,9 @@
 // ===================================================
 
 import { CONTROLS } from '../data/controls.js';
-import { gameState } from '../core/state.js';
+import { gameState, getPawnSprite } from '../core/state.js';
 import { soundManager } from '../audio/sound-manager.js';
+
 
 class FeedbackManager {
   constructor() {
@@ -24,13 +25,17 @@ class FeedbackManager {
     this.p1CountdownNum = null;
     this.p2CountdownNum = null;
 
-    // Overlays de dados
+    // Overlays de dados y peones
     this.p1RollOverlay = null;
     this.p2RollOverlay = null;
     this.p1RollDiceImg = null;
     this.p2RollDiceImg = null;
-    this.p1RollShapeImg = null;
-    this.p2RollShapeImg = null;
+    this.p1RollPawnBox = null;
+    this.p2RollPawnBox = null;
+    this.p1RollPawnImg = null;
+    this.p2RollPawnImg = null;
+    this.p1RollPawnHpText = null;
+    this.p2RollPawnHpText = null;
 
     // Personajes y reacciones
     this.p1Character = null;
@@ -55,61 +60,114 @@ class FeedbackManager {
 
     this.sharedBigCountdown = document.getElementById('shared-big-countdown');
     this.sharedCountdownNum = document.getElementById('shared-countdown-num');
-    this.p1BigCountdown = this.sharedBigCountdown || document.getElementById('p1-big-countdown');
-    this.p2BigCountdown = this.sharedBigCountdown || document.getElementById('p2-big-countdown');
-    this.p1CountdownNum = this.sharedCountdownNum || document.getElementById('p1-countdown-num');
-    this.p2CountdownNum = this.sharedCountdownNum || document.getElementById('p2-countdown-num');
 
     this.p1RollOverlay = document.getElementById('p1-roll-overlay');
     this.p2RollOverlay = document.getElementById('p2-roll-overlay');
     this.p1RollDiceImg = document.getElementById('p1-roll-dice-img');
     this.p2RollDiceImg = document.getElementById('p2-roll-dice-img');
-    this.p1RollShapeImg = document.getElementById('p1-roll-shape-img');
-    this.p2RollShapeImg = document.getElementById('p2-roll-shape-img');
+    this.p1RollPawnBox = document.getElementById('p1-roll-pawn-box');
+    this.p2RollPawnBox = document.getElementById('p2-roll-pawn-box');
+    this.p1RollPawnImg = document.getElementById('p1-roll-pawn-img');
+    this.p2RollPawnImg = document.getElementById('p2-roll-pawn-img');
+    this.p1RollPawnHpText = document.getElementById('p1-roll-pawn-hp-text');
+    this.p2RollPawnHpText = document.getElementById('p2-roll-pawn-hp-text');
 
     this.p1Character = document.getElementById('p1-character');
     this.p2Character = document.getElementById('p2-character');
     this.p1Reaction = document.getElementById('p1-reaction');
     this.p2Reaction = document.getElementById('p2-reaction');
 
-    this.updateAssaultChargesUI('both');
+    gameState.subscribe((event, payload) => {
+      if (event === 'chargeGained' || event === 'prestigeChange') {
+        if (payload?.player) {
+          this.updateAbilityChargesUI(payload.player);
+        }
+      }
+    });
+
+    this.updateAbilityChargesUI('both');
   }
 
-  updateAssaultChargesUI(player = 'both') {
+  updateAbilityChargesUI(player = 'both') {
     const targets = player === 'both' ? ['p1', 'p2'] : [player];
     targets.forEach(p => {
       const container = document.getElementById(`${p}-charges-slots`);
-      if (!container) return;
-
+      const abilityBtn = document.getElementById(`${p}-ability-btn`);
+      const hornoText = document.getElementById(`${p}-horno-text`);
       const pState = gameState[p];
-      const maxCharges = pState?.maxAbilityCharges ?? (pState?.character?.activeAbility?.maxCharges ?? 1);
-      const currentCharges = pState?.activeAbilityCharges ?? maxCharges;
+      if (!pState) return;
 
-      container.innerHTML = '';
-      for (let i = 0; i < maxCharges; i++) {
-        const slot = document.createElement('div');
-        const isAvailable = i < currentCharges;
-        slot.className = `charge-slot ${isAvailable ? 'active' : 'used'}`;
-        slot.title = isAvailable ? `Carga ${i + 1} Disponible` : `Carga ${i + 1} Usada`;
+      const maxCharges = pState.maxAbilityCharges || char?.activeAbility?.maxCharges || 1;
+      const currentCharges = pState.activeAbilityCharges ?? 0;
 
-        if (isAvailable) {
-          slot.innerHTML = `<span class="charge-icon">⚡</span>`;
-        } else {
-          slot.innerHTML = `<span class="charge-used-sq"></span>`;
+      if (container) {
+        container.innerHTML = '';
+        for (let i = 0; i < maxCharges; i++) {
+          const slot = document.createElement('div');
+          const isAvailable = i < currentCharges;
+          slot.className = `charge-slot ${isAvailable ? 'active' : 'used'}`;
+          slot.title = isAvailable ? `Carga ${i + 1} Disponible` : `Carga ${i + 1} Usada`;
+
+          if (isAvailable) {
+            slot.innerHTML = `<span class="charge-icon">⚡</span>`;
+          } else {
+            slot.innerHTML = `<span class="charge-used-sq"></span>`;
+          }
+          container.appendChild(slot);
         }
-        container.appendChild(slot);
+      }
+
+      if (abilityBtn) {
+        const canUse = currentCharges >= 1;
+        abilityBtn.disabled = !canUse;
+        if (pState.selectedAction === 'ability') {
+          abilityBtn.classList.add('action-selected');
+        } else {
+          abilityBtn.classList.remove('action-selected');
+        }
+      }
+
+      if (hornoText) {
+        hornoText.textContent = `${pState.hornoCount || 0}/3`;
       }
     });
   }
 
-  updateAbilityChargesUI(player = 'both') {
-    this.updateAssaultChargesUI(player);
+  updateAbilitySelectionUI(playerKey, isSelected) {
+    const targets = playerKey === 'both' ? ['p1', 'p2'] : [playerKey];
+    targets.forEach(p => {
+      const btn = document.getElementById(`${p}-ability-btn`);
+      if (btn) {
+        if (isSelected) {
+          btn.classList.add('action-selected');
+        } else {
+          btn.classList.remove('action-selected');
+        }
+      }
+    });
+  }
+
+  /**
+   * Muestra el contador central con el número dado.
+   * @param {number|string} num
+   */
+  showBigCountdown(num) {
+    if (this.sharedBigCountdown) this.sharedBigCountdown.classList.add('show');
+    if (this.sharedCountdownNum) {
+      this.sharedCountdownNum.textContent = num;
+      this.sharedCountdownNum.classList.add('tick-anim');
+      setTimeout(() => this.sharedCountdownNum.classList.remove('tick-anim'), 100);
+    }
+  }
+
+  hideBigCountdown() {
+    if (this.sharedBigCountdown) this.sharedBigCountdown.classList.remove('show');
   }
 
   playGridIntroAnimation(onComplete) {
     this.setBoardCurtain('both', 'hide');
     this.hideBigCountdown();
-    this.removeStandingPawnIcons();
+
 
     const p1Btns = Array.from(document.querySelectorAll('#p1-grid .casilla-btn'));
     const p2Btns = Array.from(document.querySelectorAll('#p2-grid .casilla-btn'));
@@ -144,7 +202,7 @@ class FeedbackManager {
     }, stepDelay);
   }
 
-  setBoardCurtain(player, mode, title = '', iconSrc = null, promptText = '') {
+  setBoardCurtain(player, mode, title = '', iconSrc = null, promptText = '', customKeyHTML = null) {
     const targets = player === 'both' ? ['p1', 'p2'] : [player];
 
     targets.forEach(p => {
@@ -181,76 +239,30 @@ class FeedbackManager {
         curtain.classList.add('active-black');
         if (titleEl && title) titleEl.textContent = title;
         if (imgEl && finalIcon) imgEl.src = finalIcon;
-        if (keyCapEl) keyCapEl.style.display = 'flex';
+        if (keyCapEl) {
+          keyCapEl.style.display = 'flex';
+          if (customKeyHTML !== null) {
+            keyCapEl.classList.add('has-choices');
+            keyCapEl.innerHTML = customKeyHTML;
+          } else {
+            keyCapEl.classList.remove('has-choices');
+            keyCapEl.textContent = p === 'p1' ? 'S' : 'K';
+          }
+        }
       } else if (mode === 'green') {
         curtain.classList.remove('active-black');
         curtain.classList.add('active-green');
         if (titleEl && title) titleEl.textContent = title;
         if (imgEl && finalIcon) imgEl.src = finalIcon;
-        if (keyCapEl) keyCapEl.style.display = 'none';
+        if (keyCapEl) {
+          keyCapEl.style.display = 'none';
+        }
       }
     });
   }
 
-  removeStandingPawnIcons() {
-    document.querySelectorAll('.standing-pawn-face, .standing-pawn-square').forEach(el => el.remove());
-    document.querySelectorAll('.casilla-btn').forEach(btn => btn.classList.remove('state-player'));
-  }
+  removeStandingPawnIcons() {}
 
-  updateStandingPawnIcons(p1Matrix, p1LastCell, p2Matrix, p2LastCell) {
-    this.removeStandingPawnIcons();
-
-    document.querySelectorAll('.casilla-btn').forEach(btn => btn.classList.remove('state-player'));
-
-    const p1Cell = p1LastCell || { row: 1, col: 1 };
-    const p2Cell = p2LastCell || { row: 1, col: 1 };
-
-    const p1Char = gameState.p1?.character || CONTROLS.p1;
-    const p2Char = gameState.p2?.character || CONTROLS.p2;
-
-    const p1Icon = p1Char.iconSprite || p1Char.faceSprite;
-    const p2Icon = p2Char.iconSprite || p2Char.faceSprite;
-
-    if (p1Matrix[p1Cell.row] && p1Matrix[p1Cell.row][p1Cell.col]) {
-      const btn = p1Matrix[p1Cell.row][p1Cell.col].btn;
-      btn.classList.add('state-player');
-
-      if (p1Icon) {
-        const img = document.createElement('img');
-        img.src = p1Icon;
-        img.alt = 'P1 Standing';
-        img.className = 'standing-pawn-face';
-        btn.appendChild(img);
-      } else {
-        const sq = document.createElement('div');
-        sq.className = 'standing-pawn-square';
-        sq.style.background = p1Char.color || '#22D3EE';
-        sq.style.borderColor = p1Char.borderColor || '#7C3AED';
-        sq.textContent = (p1Char.name || 'P1')[0];
-        btn.appendChild(sq);
-      }
-    }
-
-    if (p2Matrix[p2Cell.row] && p2Matrix[p2Cell.row][p2Cell.col]) {
-      const btn = p2Matrix[p2Cell.row][p2Cell.col].btn;
-      btn.classList.add('state-player');
-
-      if (p2Icon) {
-        const img = document.createElement('img');
-        img.src = p2Icon;
-        img.alt = 'P2 Standing';
-        img.className = 'standing-pawn-face';
-        btn.appendChild(img);
-      } else {
-        const sq = document.createElement('div');
-        sq.className = 'standing-pawn-square';
-        sq.style.background = p2Char.color || '#FF6F59';
-        sq.style.borderColor = p2Char.borderColor || '#EF233C';
-        sq.textContent = (p2Char.name || 'P2')[0];
-        btn.appendChild(sq);
-      }
-    }
-  }
 
   updateKeyTags(mode, gameMode = 'vs-ai') {
     const p1Keys = [['Q', 'W', 'E'], ['A', 'S', 'D'], ['Z', 'X', 'C']];
@@ -302,65 +314,6 @@ class FeedbackManager {
     }
   }
 
-  showBigCountdown(num) {
-    if (this.sharedBigCountdown) this.sharedBigCountdown.classList.add('show');
-    if (this.p1BigCountdown && this.p1BigCountdown !== this.sharedBigCountdown) this.p1BigCountdown.classList.add('show');
-    if (this.p2BigCountdown && this.p2BigCountdown !== this.sharedBigCountdown) this.p2BigCountdown.classList.add('show');
-
-    if (this.sharedCountdownNum) this.sharedCountdownNum.textContent = num;
-    if (this.p1CountdownNum) this.p1CountdownNum.textContent = num;
-    if (this.p2CountdownNum) this.p2CountdownNum.textContent = num;
-
-    if (this.sharedCountdownNum) this.sharedCountdownNum.classList.add('tick-anim');
-    if (this.p1CountdownNum) this.p1CountdownNum.classList.add('tick-anim');
-    if (this.p2CountdownNum) this.p2CountdownNum.classList.add('tick-anim');
-
-    setTimeout(() => {
-      if (this.sharedCountdownNum) this.sharedCountdownNum.classList.remove('tick-anim');
-      if (this.p1CountdownNum) this.p1CountdownNum.classList.remove('tick-anim');
-      if (this.p2CountdownNum) this.p2CountdownNum.classList.remove('tick-anim');
-    }, 100);
-  }
-
-  hideBigCountdown() {
-    if (this.sharedBigCountdown) this.sharedBigCountdown.classList.remove('show');
-    if (this.p1BigCountdown) this.p1BigCountdown.classList.remove('show');
-    if (this.p2BigCountdown) this.p2BigCountdown.classList.remove('show');
-  }
-
-  highlightValidPawnMoves(matrix, lastPawnCell) {
-    const currentPawn = lastPawnCell || { row: 1, col: 1 };
-    for (let r = 0; r < 3; r++) {
-      for (let c = 0; c < 3; c++) {
-        if (!matrix[r] || !matrix[r][c]) continue;
-        const cell = matrix[r][c];
-        const isCurrentPawn = Boolean(currentPawn && currentPawn.row === r && currentPawn.col === c);
-
-        cell.btn.classList.remove('state-hit', 'state-miss', 'state-active', 'state-player', 'state-off');
-
-        if (isCurrentPawn) {
-          cell.btn.classList.add('state-player');
-        } else {
-          const isValid = Math.abs(currentPawn.row - r) <= 1 && Math.abs(currentPawn.col - c) <= 1;
-          if (isValid) {
-            cell.btn.classList.add('state-active');
-          } else {
-            cell.btn.classList.add('state-off');
-          }
-        }
-      }
-    }
-  }
-
-  clearMoveHighlights() {
-    document.querySelectorAll('.casilla-btn').forEach(btn => {
-      btn.classList.remove('state-active');
-      if (!btn.classList.contains('state-player') && !btn.classList.contains('state-hit') && !btn.classList.contains('state-miss')) {
-        btn.classList.add('state-off');
-      }
-    });
-  }
-
   updateAttackHighlights(matrix, targetedCells) {
     // Limpiar previas
     for (let r = 0; r < 3; r++) {
@@ -397,10 +350,313 @@ class FeedbackManager {
     }
   }
 
-  revealPawn(pawnCell) {
-    if (pawnCell && pawnCell.btn) {
-      pawnCell.btn.classList.add('pawn-revealed');
+  renderPawns(p1Matrix, p1Pawns = [], p2Matrix, p2Pawns = [], gameMode = 'vs-ai') {
+    // Eliminar peones visuales existentes
+    document.querySelectorAll('.board-pawn-unit').forEach(el => el.remove());
+
+    const renderList = (matrix, pawns, playerKey) => {
+      if (!matrix || !pawns) return;
+      const isDust = gameState[playerKey]?.isDustCloudActive;
+
+      pawns.forEach(pawn => {
+        if (!pawn || pawn.hp <= 0) return;
+        const cell = matrix[pawn.row]?.[pawn.col];
+        if (!cell || !cell.btn) return;
+
+        const unitEl = document.createElement('div');
+        unitEl.className = `board-pawn-unit ${isDust ? 'pawn-cloaked' : ''} ${pawn.isTitan ? 'is-titan-unit' : ''}`;
+        unitEl.setAttribute('data-pawn-id', pawn.id || `${playerKey}_${pawn.row}_${pawn.col}`);
+
+        const pawnSrc = getPawnSprite(pawn, playerKey);
+        const hpClass = Math.min(6, Math.max(1, pawn.hp));
+        const shieldHTML = (pawn.shield > 0) ? `<span class="pawn-shield-corner" title="Escudo (+${pawn.shield})">🛡️</span>` : '';
+        const dustHTML = isDust ? `<div class="pawn-dust-cloud" title="Oculto por polvo">☁️</div>` : '';
+        const atkVal = pawn.atk ?? 0;
+        const atkHTML = `<span class="pawn-atk-corner" title="Ataque (Genera tensión): ${atkVal}">⚔️${atkVal}</span>`;
+        const titanHTML = pawn.isTitan ? `<span class="pawn-crown-tag" title="Titán">👑</span>` : '';
+
+        unitEl.innerHTML = `
+          ${dustHTML}
+          <img src="${pawnSrc}" alt="${pawn.name || 'Peón'}" class="pawn-avatar ${isDust ? 'dust-hidden' : ''}">
+          ${atkHTML}
+          <span class="pawn-hp-corner hp-${hpClass}" title="Vida: ${pawn.hp}">${pawn.hp}</span>
+          ${shieldHTML}
+          ${titanHTML}
+        `;
+        cell.btn.appendChild(unitEl);
+      });
+    };
+
+    renderList(p1Matrix, p1Pawns, 'p1');
+    renderList(p2Matrix, p2Pawns, 'p2');
+  }
+
+  animatePawnHit(matrix, row, col, isDestroyed = false, pawnOrHp = 0, targetPlayer = 'p2') {
+    if (!matrix || !matrix[row] || !matrix[row][col]) return;
+    const btn = matrix[row][col].btn;
+    if (!btn) return;
+
+    const currentHp = typeof pawnOrHp === 'object' ? (pawnOrHp.hp || 0) : (parseInt(pawnOrHp, 10) || 0);
+    const currentAtk = typeof pawnOrHp === 'object' ? (pawnOrHp.atk ?? 0) : 0;
+    const unitEl = btn.querySelector('.board-pawn-unit');
+
+    if (unitEl) {
+      if (isDestroyed) {
+        unitEl.classList.add('pawn-destroyed');
+        setTimeout(() => unitEl.remove(), 550);
+      } else {
+        unitEl.classList.add('pawn-damaged');
+        const hpBadge = unitEl.querySelector('.pawn-hp-corner');
+        if (hpBadge) {
+          const hpClass = Math.min(6, Math.max(1, currentHp));
+          hpBadge.className = `pawn-hp-corner hp-${hpClass}`;
+          hpBadge.textContent = currentHp;
+        }
+        const atkBadge = unitEl.querySelector('.pawn-atk-corner');
+        if (atkBadge) {
+          atkBadge.textContent = `⚔️${currentAtk}`;
+        }
+        const img = unitEl.querySelector('.pawn-avatar');
+        if (img) {
+          img.src = getPawnSprite(pawnOrHp, targetPlayer);
+        }
+        setTimeout(() => unitEl.classList.remove('pawn-damaged'), 400);
+      }
+    } else {
+      const pawnSrc = getPawnSprite(pawnOrHp, targetPlayer);
+      const createdUnitEl = document.createElement('div');
+      createdUnitEl.className = 'board-pawn-unit';
+
+      if (isDestroyed) {
+        createdUnitEl.classList.add('pawn-destroyed');
+        createdUnitEl.innerHTML = `
+          <img src="${pawnSrc}" alt="Peón Eliminado" class="pawn-avatar">
+          <span class="pawn-hp-corner hp-1">0</span>
+        `;
+        btn.appendChild(createdUnitEl);
+        setTimeout(() => createdUnitEl.remove(), 600);
+      } else {
+        const hpClass = Math.min(6, Math.max(1, currentHp));
+        createdUnitEl.classList.add('pawn-damaged');
+        createdUnitEl.innerHTML = `
+          <img src="${pawnSrc}" alt="Peón" class="pawn-avatar">
+          <span class="pawn-atk-corner">⚔️${currentAtk}</span>
+          <span class="pawn-hp-corner hp-${hpClass}">${currentHp}</span>
+        `;
+        btn.appendChild(createdUnitEl);
+        setTimeout(() => createdUnitEl.classList.remove('pawn-damaged'), 400);
+      }
     }
+  }
+
+  /**
+   * Genera partículas cuadradas que viajan desde la unidad hasta el sprite del héroe
+   * cuando algo añade tensión (daño por unidad, eliminaciones, habilidades).
+   * @param {HTMLElement|{row: number, col: number, playerKey?: string}|{x: number, y: number}} fromSource
+   * @param {string} targetPlayerKey 'p1' o 'p2'
+   * @param {number} amount Puntos de tensión
+   * @param {string} [color] Color de las partículas
+   */
+  /**
+   * Genera partículas cuadradas pixeladas que viajan desde una unidad hasta el sprite del héroe
+   * cuando algo añade tensión (daño por unidad, eliminaciones, habilidades).
+   * Aparecen justo sobre la unidad, levitan/se reúnen unos instantes por encima de ella y luego
+   * vuelan de forma escalonada (no simultánea) hacia el avatar del héroe.
+   * @param {HTMLElement|{row: number, col: number, playerKey?: string, id?: string}|{x: number, y: number}} fromSource
+   * @param {string} targetPlayerKey 'p1' o 'p2'
+   * @param {number} amount Puntos de tensión
+   * @param {string} [color] Color de las partículas
+   * @param {number} [initialDelay=0] Retraso inicial para secuenciar diferentes unidades
+   */
+  spawnSquareTensionParticles(fromSource, targetPlayerKey, amount = 1, color = null, initialDelay = 0) {
+    let startX = window.innerWidth / 2;
+    let startY = window.innerHeight / 2;
+    let sourceEl = null;
+
+    if (fromSource instanceof HTMLElement) {
+      sourceEl = fromSource;
+    } else if (fromSource && typeof fromSource === 'object') {
+      if (fromSource.id) {
+        sourceEl = document.querySelector(`[data-pawn-id="${fromSource.id}"]`);
+      }
+
+      let sourcePlayerKey = fromSource.playerKey;
+      if (!sourcePlayerKey && fromSource.id) {
+        if (gameState.p1?.pawns?.some(p => p.id === fromSource.id)) sourcePlayerKey = 'p1';
+        else if (gameState.p2?.pawns?.some(p => p.id === fromSource.id)) sourcePlayerKey = 'p2';
+      }
+
+      if (typeof fromSource.row === 'number' && typeof fromSource.col === 'number') {
+        if (!sourcePlayerKey) {
+          if (gameState.p1?.pawns?.some(p => p.row === fromSource.row && p.col === fromSource.col)) {
+            sourcePlayerKey = 'p1';
+          } else if (gameState.p2?.pawns?.some(p => p.row === fromSource.row && p.col === fromSource.col)) {
+            sourcePlayerKey = 'p2';
+          } else {
+            sourcePlayerKey = targetPlayerKey;
+          }
+        }
+        if (!sourceEl) {
+          sourceEl = document.querySelector(`.casilla-btn[data-player="${sourcePlayerKey}"][data-row="${fromSource.row}"][data-col="${fromSource.col}"]`);
+        }
+      }
+    }
+
+    if (sourceEl) {
+      const rect = sourceEl.getBoundingClientRect();
+      startX = rect.left + rect.width / 2;
+      // Posicionar el origen en la parte superior del peón (cabeza / borde superior)
+      startY = rect.top + Math.min(20, rect.height * 0.28);
+
+      // Resaltar visualmente la unidad que genera tensión
+      const unitPawnEl = sourceEl.classList.contains('board-pawn-unit') 
+        ? sourceEl 
+        : (sourceEl.querySelector('.board-pawn-unit') || sourceEl);
+
+      setTimeout(() => {
+        unitPawnEl.classList.add('tension-source-active');
+        setTimeout(() => unitPawnEl.classList.remove('tension-source-active'), 1200);
+      }, initialDelay);
+    } else if (fromSource && typeof fromSource.x === 'number' && typeof fromSource.y === 'number') {
+      startX = fromSource.x;
+      startY = fromSource.y;
+    }
+
+    const heroSpriteEl = document.getElementById(`${targetPlayerKey}-character-sprite`) || document.getElementById(`${targetPlayerKey}-character`);
+    let endX = targetPlayerKey === 'p1' ? 120 : window.innerWidth - 120;
+    let endY = 160;
+
+    if (heroSpriteEl) {
+      const hRect = heroSpriteEl.getBoundingClientRect();
+      endX = hRect.left + hRect.width / 2;
+      endY = hRect.top + hRect.height / 2;
+    }
+
+    const charColor = color || gameState[targetPlayerKey]?.character?.color || (targetPlayerKey === 'p1' ? '#38bdf8' : '#fbbf24');
+    // Cantidad de partículas adaptada al valor de tensión (entre 3 y 10)
+    const particleCount = Math.min(10, Math.max(3, Math.round(amount * 1.5)));
+
+    let overlay = document.getElementById('tension-particles-container');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'tension-particles-container';
+      overlay.className = 'tension-particles-layer';
+      document.body.appendChild(overlay);
+    }
+
+    // Escalado de tiempos: partículas escalonadas (no simultáneas)
+    // Cada partícula sale con una cadencia marcada (120ms)
+    const staggerStep = 120;
+
+    for (let i = 0; i < particleCount; i++) {
+      const p = document.createElement('div');
+      p.className = 'pixel-tension-square';
+      const size = 8 + (i % 3) * 2; // 8px, 10px, 12px
+      p.style.width = `${size}px`;
+      p.style.height = `${size}px`;
+      p.style.background = charColor;
+      p.style.color = charColor;
+      p.style.boxShadow = `0 0 6px #fff, 0 0 10px ${charColor}, 0 0 16px ${charColor}`;
+      p.style.left = '0px';
+      p.style.top = '0px';
+
+      overlay.appendChild(p);
+
+      // Posición inicial justo arriba del peón
+      const originX = startX - size / 2;
+      const originY = startY - size / 2;
+      const targetX = endX - size / 2;
+      const targetY = endY - size / 2;
+
+      // Desplazamiento flotante sobre la unidad (entre 26px y 44px por encima)
+      const hoverSpreadX = (Math.random() - 0.5) * 28;
+      const hoverSpreadY = -(28 + Math.random() * 18);
+      const hoverX = originX + hoverSpreadX;
+      const hoverY = originY + hoverSpreadY;
+
+      const particleDelay = initialDelay + i * staggerStep;
+      const flightDuration = 820;
+
+      // Animación en fases:
+      // 1. Emerge y sube flotando por encima de la unidad (offset 0 -> 0.22)
+      // 2. Levita suspendida brevemente sobre la cabeza de la unidad (offset 0.22 -> 0.38)
+      // 3. Acelera rápidamente hacia el avatar del héroe (offset 0.38 -> 0.88)
+      // 4. Detona al absorberse en el sprite del héroe (offset 0.88 -> 1.0)
+      p.animate([
+        {
+          transform: `translate(${originX}px, ${originY}px) scale(0.2)`,
+          opacity: 0,
+          easing: 'ease-out'
+        },
+        {
+          transform: `translate(${hoverX}px, ${hoverY}px) scale(1.4)`,
+          opacity: 1,
+          offset: 0.22,
+          easing: 'ease-in-out'
+        },
+        {
+          transform: `translate(${hoverX}px, ${hoverY - 4}px) scale(1.15)`,
+          opacity: 1,
+          offset: 0.38,
+          easing: 'cubic-bezier(0.5, 0, 0.2, 1)'
+        },
+        {
+          transform: `translate(${targetX}px, ${targetY}px) scale(0.85)`,
+          opacity: 1,
+          offset: 0.88,
+          easing: 'ease-out'
+        },
+        {
+          transform: `translate(${targetX}px, ${targetY}px) scale(1.8)`,
+          opacity: 0,
+          offset: 1.0
+        }
+      ], {
+        duration: flightDuration,
+        delay: particleDelay,
+        fill: 'forwards'
+      }).onfinish = () => {
+        p.remove();
+      };
+
+      // Pulso reactivo en el sprite del héroe conforme cada partícula impacta
+      setTimeout(() => {
+        if (heroSpriteEl) {
+          heroSpriteEl.classList.remove('hero-tension-pulse');
+          void heroSpriteEl.offsetWidth;
+          heroSpriteEl.classList.add('hero-tension-pulse');
+        }
+      }, particleDelay + Math.round(flightDuration * 0.88));
+    }
+  }
+
+  highlightFreeCells(matrix, pawns = [], isCellBlocked = null) {
+    const pawnList = Array.isArray(pawns) ? pawns : [];
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        if (!matrix[r] || !matrix[r][c]) continue;
+        const btn = matrix[r][c].btn;
+        const isOccupied = pawnList.some(p => p && p.row === r && p.col === c && p.hp > 0);
+        const isBlocked = isCellBlocked ? isCellBlocked(r, c) : false;
+        btn.classList.remove('state-active', 'state-hit', 'state-miss');
+        if (!isOccupied && !isBlocked) {
+          btn.classList.remove('state-off');
+          btn.classList.add('state-active');
+        } else {
+          btn.classList.remove('state-active');
+          btn.classList.add('state-off');
+        }
+      }
+    }
+  }
+
+  clearPawnHighlights() {
+    document.querySelectorAll('.casilla-btn').forEach(btn => {
+      btn.classList.remove('state-active');
+      if (!btn.classList.contains('state-hit') && !btn.classList.contains('state-miss')) {
+        btn.classList.add('state-off');
+      }
+    });
   }
 
   triggerAttackAnimations() {
@@ -431,16 +687,16 @@ class FeedbackManager {
     }
   }
 
-  showPlaceholderActivation(player, message = 'placeholder activado') {
-    this.showReactionBadge(player, message, 'show-placeholder');
+  showAbilityActivation(player, message = 'Habilidad activada') {
+    this.showReactionBadge(player, message, 'show-ability show-placeholder');
 
     const panelId = player === 'p1' ? 'player-1-panel' : 'player-2-panel';
     const panel = document.getElementById(panelId);
     if (panel) {
-      panel.querySelectorAll('.placeholder-activation-banner').forEach(el => el.remove());
+      panel.querySelectorAll('.ability-activation-banner, .placeholder-activation-banner').forEach(el => el.remove());
       const banner = document.createElement('div');
-      banner.className = 'placeholder-activation-banner';
-      banner.innerHTML = `<span class="placeholder-icon">⚡</span> ${message}`;
+      banner.className = 'ability-activation-banner placeholder-activation-banner';
+      banner.innerHTML = `<span class="ability-icon placeholder-icon">⚡</span> ${message}`;
       panel.appendChild(banner);
 
       setTimeout(() => {
@@ -449,16 +705,20 @@ class FeedbackManager {
       }, 1600);
     }
 
-    if (!this.placeholderBadgeTimeouts) this.placeholderBadgeTimeouts = {};
-    if (this.placeholderBadgeTimeouts[player]) {
-      clearTimeout(this.placeholderBadgeTimeouts[player]);
+    if (!this.abilityBadgeTimeouts) this.abilityBadgeTimeouts = {};
+    if (this.abilityBadgeTimeouts[player]) {
+      clearTimeout(this.abilityBadgeTimeouts[player]);
     }
-    this.placeholderBadgeTimeouts[player] = setTimeout(() => {
+    this.abilityBadgeTimeouts[player] = setTimeout(() => {
       const badge = player === 'p1' ? this.p1Reaction : this.p2Reaction;
-      if (badge && badge.classList.contains('show-placeholder')) {
+      if (badge && (badge.classList.contains('show-ability') || badge.classList.contains('show-placeholder'))) {
         badge.className = 'character-reaction-badge';
       }
     }, 2000);
+  }
+
+  showPlaceholderActivation(player, message) {
+    this.showAbilityActivation(player, message);
   }
 
   hideReactionBadge(player) {
@@ -628,22 +888,76 @@ class FeedbackManager {
     if (this.p2RollOverlay) this.p2RollOverlay.className = 'board-roll-overlay';
   }
 
-  showVerticalCombatBars() {
-    const section = document.querySelector('.vertical-combat-section');
-    if (section) section.classList.add('show');
-  }
-
-  hideVerticalCombatBars() {
-    const section = document.querySelector('.vertical-combat-section');
-    if (section) section.classList.remove('show');
-  }
-
   clearBoardEffects() {
-    this.hideVerticalCombatBars();
     document.querySelectorAll('.casilla-btn').forEach(btn => {
-      btn.classList.remove('pawn-revealed', 'state-hit', 'state-miss', 'state-active', 'state-player');
+      btn.classList.remove('cell-damage-flash', 'state-hit', 'state-miss', 'state-active', 'state-player', 'state-scan-enemy', 'state-scan-empty');
       btn.classList.add('state-off');
     });
+  }
+
+  rotateBoards(rotated = true) {
+    const cluster = document.getElementById('boards-cluster');
+    if (!cluster) return;
+    if (rotated) {
+      cluster.classList.add('rotated-180');
+    } else {
+      cluster.classList.remove('rotated-180');
+    }
+  }
+
+  resetBoardsRotation() {
+    this.rotateBoards(false);
+  }
+
+  setPlayerReadyCheckbox(player, isReady, gameMode = 'vs-ai', disabled = false) {
+    const bar = document.getElementById(`${player}-ready-bar`);
+    const check = document.getElementById(`${player}-ready-checkbox`);
+    const textLabel = document.getElementById(`${player}-ready-text-label`);
+
+    if (!bar || !check || !textLabel) return;
+
+    if (disabled) {
+      bar.classList.add('is-disabled');
+      bar.classList.remove('is-ready');
+      check.disabled = true;
+      check.checked = false;
+      textLabel.textContent = 'ESPERA';
+      return;
+    }
+
+    bar.classList.remove('is-disabled');
+
+    const isBot = (gameMode === 'vs-ai' && player === 'p2');
+    if (isBot) {
+      check.disabled = true;
+      bar.style.pointerEvents = 'none';
+      check.checked = isReady;
+      if (isReady) {
+        bar.classList.add('is-ready');
+        textLabel.textContent = 'IA LISTA';
+      } else {
+        bar.classList.remove('is-ready');
+        textLabel.textContent = 'PENSANDO';
+      }
+      return;
+    }
+
+    check.disabled = false;
+    bar.style.pointerEvents = 'auto';
+    check.checked = isReady;
+
+    if (isReady) {
+      bar.classList.add('is-ready');
+      textLabel.textContent = '¡LISTO!';
+    } else {
+      bar.classList.remove('is-ready');
+      textLabel.textContent = 'LISTO';
+    }
+  }
+
+  updateReadyCheckboxes(p1Ready, p2Ready, gameMode = 'vs-ai', disabled = false) {
+    this.setPlayerReadyCheckbox('p1', p1Ready, gameMode, disabled);
+    this.setPlayerReadyCheckbox('p2', p2Ready, gameMode, disabled);
   }
 }
 

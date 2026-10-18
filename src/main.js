@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Placeholders con animación visual al pulsar
+  // Botones de modos futuros (Historia, Tutorial, Ajustes) con animación visual al pulsar
   [btnStory, btnTutorial, btnSettings].forEach(btn => {
     if (btn) {
       btn.addEventListener('click', () => {
@@ -58,6 +58,20 @@ document.addEventListener('DOMContentLoaded', () => {
   // Control global de teclado
   window.addEventListener('keydown', (e) => {
     soundManager.startBackgroundMusic();
+
+    // Control de Listo por jugador: Espacio para P1 y Enter para P2
+    if (e.code === 'Space' || e.key === ' ' || e.keyCode === 32) {
+      e.preventDefault();
+      gameController.handleReadyInput('p1');
+      return;
+    }
+
+    if (e.code === 'Enter' || e.key === 'Enter' || e.keyCode === 13) {
+      e.preventDefault();
+      gameController.handleReadyInput('p2');
+      return;
+    }
+
     const key = e.key.toLowerCase();
     if (CONTROLS.p1.keyList.includes(key)) {
       gameController.handleInput('p1', key);
@@ -68,3 +82,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+

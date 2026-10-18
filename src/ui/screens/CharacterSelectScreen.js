@@ -5,7 +5,7 @@
 
 import { CHARACTERS } from '../../data/characters.js';
 
-export function renderCharacterSelectScreen(gameMode = 'vs-ai', onSelectionFinished) {
+export function renderCharacterSelectScreen(gameMode = 'vs-ai', onSelectionFinished, onNavigateHome = null) {
   const container = document.createElement('div');
   container.className = 'game-screen active-screen';
   container.id = 'screen-char-select';
@@ -61,10 +61,10 @@ export function renderCharacterSelectScreen(gameMode = 'vs-ai', onSelectionFinis
           <header class="select-panel-header">
             <div class="char-nav-controls">
               <button class="nav-icon-btn" id="btn-char-nav-home" title="Volver al Menú Principal">
-                <span class="nav-icon"><img src="/assets/sprites/Icon_home.png" alt="Home"></span>
+                <span class="nav-icon"><img src="/assets/sprites/UI/Icon_home.png" alt="Home"></span>
               </button>
               <button class="nav-icon-btn" id="btn-char-nav-back" title="Volver Atrás">
-                <span class="nav-icon"><img src="/assets/sprites/Icon_back.png" alt="Back"></span>
+                <span class="nav-icon"><img src="/assets/sprites/UI/Icon_back.png" alt="Back"></span>
               </button>
             </div>
             <h2 class="char-select-title">Selecciona tu sintético</h2>
@@ -145,23 +145,45 @@ export function renderCharacterSelectScreen(gameMode = 'vs-ai', onSelectionFinis
     if (detailsEl) {
       if (char) {
         detailsEl.innerHTML = `
-          <div class="ability-box dice-ability-box">
-            <div class="ability-title">🎲 DADO ASIMÉTRICO</div>
-            <div class="dice-faces-preview">
-              ${(char.diceFaces || []).map(val => `<span class="dice-face-pill" title="Cara ${val}">${val}</span>`).join('')}
+          ${char.quote ? `
+            <div class="char-quote-card" style="margin-bottom: 8px; font-style: italic; color: #94a3b8; font-size: 0.65rem; border-left: 2px solid ${themeColor}; padding-left: 6px;">
+              "${char.quote}"
             </div>
+          ` : ''}
+
+          ${char.trait ? `
+            <div class="ability-box trait-ability-box" style="border-color: #f59e0b;">
+              <div class="ability-title" style="color: #fbbf24;">⚙️ TRAIT: ${char.trait.name}</div>
+              <div class="ability-desc">${char.trait.description}</div>
+            </div>
+          ` : ''}
+
+          <div class="ability-box passive-ability-box">
+            <div class="ability-title">🛡️ PASIVA: ${char.passiveAbility?.name || 'Pasiva'}</div>
+            <div class="ability-desc">${char.passiveAbility?.description || 'Efecto pasivo constante'}</div>
           </div>
 
           <div class="ability-box active-ability-box">
-            <div class="ability-title">⚡ ACTIVA: ${char.activeAbility?.name || 'Placeholder'}</div>
-            <div class="ability-desc">${char.activeAbility?.description || 'Carga activa placeholder'}</div>
-            <div class="ability-charges">Cargas: <strong>${char.activeAbility?.maxCharges ?? 1}</strong></div>
+            <div class="ability-title">⚡ ACTIVA [1 Carga]: ${char.activeAbility?.name || 'Activa'}</div>
+            <div class="ability-desc">${char.activeAbility?.description || 'Habilidad especial de combate'}</div>
+            <div class="ability-charges">Coste: <strong>1 Carga</strong> (Capacidad máx: <strong>${char.activeAbility?.maxCharges || 1}</strong>)</div>
           </div>
 
-          <div class="ability-box passive-ability-box">
-            <div class="ability-title">🛡️ PASIVA: ${char.passiveAbility?.name || 'Por definir'}</div>
-            <div class="ability-desc">${char.passiveAbility?.description || 'Habilidad pasiva pendiente de asignación'}</div>
+          <div class="ability-box titan-ability-box" style="border-color: #ec4899;">
+            <div class="ability-title" style="color: #f472b6;">👑 TITÁN (CON DADO 6): ${char.titanAbility?.name || 'Habilidad Titán'}</div>
+            <div class="ability-desc">${char.titanAbility?.description || 'Boost titánico al sacar un 6'}</div>
           </div>
+
+          ${char.units ? `
+            <div class="ability-box units-overview-box" style="border-color: #38bdf8; background: rgba(15, 23, 42, 0.6);">
+              <div class="ability-title" style="color: #38bdf8;">♟️ UNIDADES (DAÑO/VIDA)</div>
+              <div class="ability-desc" style="display: flex; flex-direction: column; gap: 3px; font-size: 0.62rem;">
+                <div><strong>👑 Titán (${char.units.titan.atk}/${char.units.titan.hp})</strong>: ${char.units.titan.description}</div>
+                <div><strong>🗼 Mediana (${char.units.mediana.atk}/${char.units.mediana.hp})</strong>: ${char.units.mediana.description}</div>
+                <div><strong>♟ Pequeña (${char.units.pequena.atk}/${char.units.pequena.hp})</strong>: ${char.units.pequena.description}</div>
+              </div>
+            </div>
+          ` : ''}
         `;
       } else {
         detailsEl.innerHTML = `
@@ -327,9 +349,9 @@ export function renderCharacterSelectScreen(gameMode = 'vs-ai', onSelectionFinis
   const homeNavBtn = container.querySelector('#btn-char-nav-home');
   if (homeNavBtn) {
     homeNavBtn.addEventListener('click', () => {
-      import('../screens.js').then(({ screens }) => {
-        screens.showScreen('start');
-      });
+      if (typeof onNavigateHome === 'function') {
+        onNavigateHome();
+      }
     });
   }
 
@@ -346,9 +368,9 @@ export function renderCharacterSelectScreen(gameMode = 'vs-ai', onSelectionFinis
         p1HoverChar = null;
         updateView();
       } else {
-        import('../screens.js').then(({ screens }) => {
-          screens.showScreen('start');
-        });
+        if (typeof onNavigateHome === 'function') {
+          onNavigateHome();
+        }
       }
     });
   }

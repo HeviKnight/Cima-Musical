@@ -13,17 +13,15 @@ function renderGridButtons(playerKey) {
     row.map((key, c) => `
       <button class="casilla-btn" data-key="${key}" data-row="${r}" data-col="${c}" data-player="${playerKey}">
         <span class="key-tag">${key.toUpperCase()}</span>
-        <span class="pawn-reveal-marker"></span>
       </button>`
     )
   ).join('');
 }
 
-function renderPlayerPanel(playerKey) {
+function renderPlayerStage(playerKey) {
   const isP1 = playerKey === 'p1';
   const playerNum = isP1 ? '1' : '2';
   const playerTag = isP1 ? '1P' : '2P';
-  const initialKey = isP1 ? 'S' : 'K';
   const char = gameState[playerKey]?.character || (isP1 ? CONTROLS.p1 : CONTROLS.p2);
 
   const themeColor = char.color || (isP1 ? '#8B5CF6' : '#EF4444');
@@ -53,32 +51,14 @@ function renderPlayerPanel(playerKey) {
     </div>
   `;
 
-  const curtainAvatarHTML = (char.iconSprite || char.faceSprite) ? `
-    <img src="${char.iconSprite || char.faceSprite}" alt="${charName}" class="curtain-img" id="${playerKey}-curtain-img">
-  ` : `
-    <div class="curtain-square-avatar" id="${playerKey}-curtain-img" style="background: ${themeColor}; border: 2px solid ${borderColor}">
-      <span>${initialLetter}</span>
-    </div>
-  `;
 
-  const maxCharges = char.activeAbility?.maxCharges ?? 1;
-  const currentCharges = gameState[playerKey]?.activeAbilityCharges ?? maxCharges;
-
-  let chargesSlotsHTML = '';
-  for (let i = 0; i < maxCharges; i++) {
-    const isAvailable = i < currentCharges;
-    chargesSlotsHTML += `
-      <div class="charge-slot ${isAvailable ? 'active' : 'used'}" title="${isAvailable ? 'Carga Disponible' : 'Carga Usada'}">
-        ${isAvailable ? '<span class="charge-icon">⚡</span>' : '<span class="charge-used-sq"></span>'}
-      </div>
-    `;
-  }
 
   return `
     <section class="game-side-panel char-side-panel ${isP1 ? 'p1-side-panel' : 'p2-side-panel'}" id="player-${playerNum}-panel" style="${panelStyle}">
-      <!-- Cabecera de Jugador: Badge -->
+      <!-- Cabecera de Jugador: Badge y Nombre -->
       <header class="side-panel-header">
         <span class="side-panel-badge ${playerKey}-badge">${playerTag}</span>
+        <span class="player-char-title">${charName}</span>
       </header>
 
       <!-- Stage del Personaje (Sprite animado) -->
@@ -90,12 +70,14 @@ function renderPlayerPanel(playerKey) {
         </div>
       </div>
 
-      <!-- Contenedor conjunto de Cargas y Barra de Tensión -->
+      <!-- Contenedor conjunto de Barra de Tensión -->
       <div class="prestige-section-wrapper ${playerKey}-prestige-section">
-        <!-- Iconos de Cargas de Asalto (encima de la barra de tensión) -->
-        <div class="charges-slots-wrapper" id="${playerKey}-charges-slots">
-          ${chargesSlotsHTML}
-        </div>
+        ${char.id === 'incinerador' ? `
+          <div class="horno-counter-badge" id="${playerKey}-horno-badge" title="Contador del Horno" style="margin-bottom: 6px;">
+            <span class="horno-icon">🔥</span>
+            <span class="horno-text" id="${playerKey}-horno-text">0/3</span>
+          </div>
+        ` : ''}
 
         <!-- Barra de Tensión / Prestigio ocupando todo el ancho debajo del personaje -->
         <div class="prestige-widget full-width-prestige" id="${playerKey}-prestige-widget" title="Medidor de Prestigio Jugador ${playerNum}">
@@ -113,42 +95,73 @@ function renderPlayerPanel(playerKey) {
         </div>
       </div>
 
-      <!-- Tablero 3x3 y Cortinilla -->
-      <div class="grid-board-wrapper">
-        <div class="grid-relative-box" id="${playerKey}-grid-container">
-          <div class="grid-3x3" id="${playerKey}-grid">
-            ${renderGridButtons(playerKey)}
-          </div>
-
-          <!-- Overlay de Animación de Dados sobre el Grid -->
-          <div class="board-roll-overlay" id="${playerKey}-roll-overlay">
-            <div class="roll-overlay-box">
-              <div class="roll-number-badge">
-                <img src="/assets/sprites/Dado_spr_1.png" alt="Dado" class="roll-dice-sprite" id="${playerKey}-roll-dice-img">
-              </div>
-              <div class="roll-shape-badge">
-                <img src="/assets/sprites/attack1.png" alt="Ataque" class="roll-shape-sprite" id="${playerKey}-roll-shape-img">
-              </div>
-            </div>
-          </div>
-
-          <!-- Cortinilla Overlay sobre el tablero -->
-          <div class="board-curtain-overlay active-black" id="${playerKey}-curtain">
-            <div class="curtain-content">
-              <div class="curtain-icon-wrapper" id="${playerKey}-curtain-icon-box">
-                ${curtainAvatarHTML}
-              </div>
-              <div class="curtain-title" id="${playerKey}-curtain-title">A LA PISTA</div>
-              <div class="curtain-key-cap" id="${playerKey}-curtain-key">${initialKey}</div>
-            </div>
-          </div>
-        </div>
+      <!-- Control Checkbox de Listo -->
+      <div class="player-ready-bar ${playerKey}-ready-bar" id="${playerKey}-ready-bar" data-player="${playerKey}" title="Marca cuando estés listo para avanzar de fase">
+        <input type="checkbox" id="${playerKey}-ready-checkbox" class="player-ready-checkbox" tabindex="-1" />
+        <span class="ready-checkbox-custom">
+          <span class="ready-checkmark">✔</span>
+        </span>
+        <span class="ready-key-badge">${isP1 ? 'ESPACIO' : 'ENTER'}</span>
+        <span class="ready-text-label" id="${playerKey}-ready-text-label">LISTO</span>
       </div>
     </section>
   `;
 }
 
-export function renderGameScreen() {
+function renderPlayerBoard(playerKey) {
+  const isP1 = playerKey === 'p1';
+  const initialKey = isP1 ? 'S' : 'K';
+  const char = gameState[playerKey]?.character || (isP1 ? CONTROLS.p1 : CONTROLS.p2);
+  const themeColor = char.color || (isP1 ? '#8B5CF6' : '#EF4444');
+  const borderColor = char.borderColor || (isP1 ? '#7C3AED' : '#B91C1C');
+  const charName = char.name || (isP1 ? 'P1' : 'P2');
+  const initialLetter = charName[0] || (isP1 ? '1P' : '2P');
+
+  const curtainAvatarHTML = (char.iconSprite || char.faceSprite) ? `
+    <img src="${char.iconSprite || char.faceSprite}" alt="${charName}" class="curtain-img" id="${playerKey}-curtain-img">
+  ` : `
+    <div class="curtain-square-avatar" id="${playerKey}-curtain-img" style="background: ${themeColor}; border: 2px solid ${borderColor}">
+      <span>${initialLetter}</span>
+    </div>
+  `;
+
+  return `
+    <!-- Tablero 3x3 y Cortinilla (${playerKey.toUpperCase()}) -->
+    <div class="grid-board-wrapper ${playerKey}-board-wrapper" style="--player-border-color: ${borderColor}; --player-glow: ${themeColor}55;">
+      <div class="grid-relative-box" id="${playerKey}-grid-container">
+        <div class="grid-3x3" id="${playerKey}-grid">
+          ${renderGridButtons(playerKey)}
+        </div>
+
+        <!-- Overlay de Animación de Dados sobre el Grid (Reclutamiento de Peón) -->
+        <div class="board-roll-overlay" id="${playerKey}-roll-overlay">
+          <div class="roll-overlay-box">
+            <div class="roll-number-badge">
+              <img src="/assets/sprites/UI/Dado_spr_1.png" alt="Dado" class="roll-dice-sprite" id="${playerKey}-roll-dice-img">
+            </div>
+            <div class="roll-pawn-badge" id="${playerKey}-roll-pawn-box" style="display: none;">
+              <img src="${char.iconSprite || char.faceSprite || '/assets/sprites/heroes/CH_Icon_Cyborg.png'}" alt="Peón" class="roll-pawn-sprite" id="${playerKey}-roll-pawn-img">
+              <div class="roll-pawn-hp-text" id="${playerKey}-roll-pawn-hp-text">1 HP</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cortinilla Overlay sobre el tablero -->
+        <div class="board-curtain-overlay active-black" id="${playerKey}-curtain">
+          <div class="curtain-content">
+            <div class="curtain-icon-wrapper" id="${playerKey}-curtain-icon-box">
+              ${curtainAvatarHTML}
+            </div>
+            <div class="curtain-title" id="${playerKey}-curtain-title">TIRAR DADO</div>
+            <div class="curtain-key-cap" id="${playerKey}-curtain-key">${initialKey}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+export function renderGameScreen(onNavigateHome = null) {
   const container = document.createElement('div');
   container.className = 'game-screen active-screen';
   container.id = 'screen-game';
@@ -167,70 +180,59 @@ export function renderGameScreen() {
   container.innerHTML = `
     <div class="screen-card game-battle-card arcade-select-card" id="game-wrapper">
       <main class="battle-arcade-layout">
-        <!-- DIV 1: PANEL IZQUIERDO (JUGADOR 1) -->
-        ${renderPlayerPanel('p1')}
+        <!-- ZONA SUPERIOR: ESQUINAS CON PERSONAJES & CENTRO CON RONDA/TIMER -->
+        <div class="battle-top-section">
+          <!-- ESQUINA SUPERIOR IZQUIERDA: P1 -->
+          ${renderPlayerStage('p1')}
 
-        <!-- DIV 2: SECCIÓN CENTRAL DE COMBATE -->
-        <div class="game-center-section" id="battle-center-panel">
-          <!-- Botón Superior de Menú/Home sin H de Combate -->
-          <div class="center-top-bar">
-            <button class="nav-icon-btn" id="btn-game-nav-home" title="Volver al Menú Principal">
-              <span class="nav-icon"><img src="/assets/sprites/Icon_home.png" alt="Home"></span>
-            </button>
-          </div>
-
-          <!-- Contador de Ronda a todo el ancho (2 partes: Ronda arriba, Fase sólida abajo) -->
-          <div class="central-round-wrapper">
-            <div class="round-counter-header">
-              <span class="round-counter-label">RONDA</span>
-              <span class="round-counter-num" id="round-num-val">1</span>
-            </div>
-            <div class="phase-tag-banner phase-placement" id="round-drawer-badge">
-              <span id="round-drawer-text">COLOCAR</span>
-            </div>
-          </div>
-
-          <!-- Contador de Tiempo Compartido -->
-          <div class="central-timer-wrapper" id="shared-big-countdown">
-            <span class="central-timer-label">TIEMPO</span>
-            <span class="countdown-big-num" id="shared-countdown-num">3</span>
-          </div>
-
-          <!-- Barras Verticales de Combate pegadas a los lados y abajo del todo -->
-          <div class="vertical-combat-section">
-            <!-- Barra Vertical Jugador 1 (Pegada a la izquierda / colores P1 / sin border radius / abajo del todo) -->
-            <div class="vertical-player-bar p1-vertical-bar" id="p1-combat-strip" style="--bar-theme: ${p1Theme}; --bar-border: ${p1Border}; --bar-bg: ${p1Bg};">
-              <img src="/assets/sprites/Dado_spr_1.png" alt="Dado P1" class="strip-dice-img" id="p1-central-dice-img">
-              <img src="/assets/sprites/attack1.png" alt="Figura P1" class="strip-shape-img" id="p1-central-shape-img">
+          <!-- CENTRO SUPERIOR: BOTÓN HOME, RONDA Y TEMPORIZADOR -->
+          <div class="game-center-section" id="battle-center-panel">
+            <div class="center-top-bar">
+              <button class="nav-icon-btn" id="btn-game-nav-home" title="Volver al Menú Principal">
+                <span class="nav-icon"><img src="/assets/sprites/UI/Icon_home.png" alt="Home"></span>
+              </button>
             </div>
 
-            <!-- Barra Vertical Jugador 2 (Pegada a la derecha / colores P2 / sin border radius / abajo del todo) -->
-            <div class="vertical-player-bar p2-vertical-bar" id="p2-combat-strip" style="--bar-theme: ${p2Theme}; --bar-border: ${p2Border}; --bar-bg: ${p2Bg};">
-              <img src="/assets/sprites/Dado_spr_1.png" alt="Dado P2" class="strip-dice-img" id="p2-central-dice-img">
-              <img src="/assets/sprites/attack1.png" alt="Figura P2" class="strip-shape-img" id="p2-central-shape-img">
+            <div class="central-round-wrapper">
+              <div class="round-counter-header">
+                <span class="round-counter-label">RONDA</span>
+                <span class="round-counter-num" id="round-num-val">1</span>
+              </div>
+              <div class="phase-tag-banner phase-placement" id="round-drawer-badge">
+                <span id="round-drawer-text">COLOCAR</span>
+              </div>
+            </div>
+
+            <div class="central-timer-wrapper" id="shared-big-countdown">
+              <span class="central-timer-label">TIEMPO</span>
+              <span class="countdown-big-num" id="shared-countdown-num">3</span>
             </div>
           </div>
+
+          <!-- ESQUINA SUPERIOR DERECHA: P2 -->
+          ${renderPlayerStage('p2')}
         </div>
 
-        <!-- DIV 3: PANEL DERECHO (JUGADOR 2) -->
-        ${renderPlayerPanel('p2')}
+        <!-- ZONA INFERIOR: CONTENEDOR CON AMBOS TABLEROS PEGADOS -->
+        <div class="battle-bottom-boards-container" id="battle-boards-container">
+          <div class="boards-cluster" id="boards-cluster">
+            ${renderPlayerBoard('p1')}
+            ${renderPlayerBoard('p2')}
+          </div>
+        </div>
       </main>
     </div>
   `;
 
   // Event listener para el botón de inicio/menú
-  setTimeout(() => {
-    const homeNavBtn = container.querySelector('#btn-game-nav-home');
-    if (homeNavBtn) {
-      homeNavBtn.addEventListener('click', () => {
-        import('../screens.js').then(({ screens }) => {
-          screens.showScreen('start');
-        });
-      });
-    }
-  }, 0);
+  const homeNavBtn = container.querySelector('#btn-game-nav-home');
+  if (homeNavBtn) {
+    homeNavBtn.addEventListener('click', () => {
+      if (typeof onNavigateHome === 'function') {
+        onNavigateHome();
+      }
+    });
+  }
 
   return container;
 }
-
-

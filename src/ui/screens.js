@@ -36,7 +36,11 @@ class ScreensManager {
 
   mountCharacterSelectScreen(gameMode, onSelectionFinished) {
     this.clearDynamicScreens();
-    const charSelectElem = renderCharacterSelectScreen(gameMode, onSelectionFinished);
+    const charSelectElem = renderCharacterSelectScreen(
+      gameMode,
+      onSelectionFinished,
+      () => this.showScreen('start')
+    );
     if (this.dynamicContainer) {
       this.dynamicContainer.appendChild(charSelectElem);
     }
@@ -47,7 +51,7 @@ class ScreensManager {
 
   mountGameScreen() {
     this.clearDynamicScreens();
-    const gameElem = renderGameScreen();
+    const gameElem = renderGameScreen(() => this.showScreen('start'));
     if (this.dynamicContainer) {
       this.dynamicContainer.appendChild(gameElem);
     }
@@ -85,70 +89,98 @@ class ScreensManager {
 
   applyGameOverData(p1Prestige, p2Prestige) {
     const faceWrapper = document.getElementById('go-face-wrapper');
+    const winnerNameEl = document.getElementById('go-winner-name');
+    const winnerTagEl = document.getElementById('go-winner-tag');
+    const crownEl = document.getElementById('go-crown');
+
+    // Elementos de marcador y nombres
+    const p1NameEl = document.getElementById('go-p1-name');
+    const p2NameEl = document.getElementById('go-p2-name');
+    const p1PresEl = document.getElementById('go-p1-prestige');
+    const p2PresEl = document.getElementById('go-p2-prestige');
+    const p1Col = document.getElementById('go-p1-col');
+    const p2Col = document.getElementById('go-p2-col');
 
     const p1Char = gameState.p1?.character || CONTROLS.p1;
     const p2Char = gameState.p2?.character || CONTROLS.p2;
 
-    if (p1Prestige === p2Prestige) {
-      // EMPATE (Draw)
-      if (this.goWinnerBadge) {
-        this.goWinnerBadge.textContent = DRAW_RESULT.headline;
-        this.goWinnerBadge.style.color = DRAW_RESULT.color;
-        this.goWinnerBadge.style.borderColor = DRAW_RESULT.borderColor;
+    const p1Val = Math.min(100, Math.max(0, p1Prestige ?? gameState.p1.prestige ?? 0));
+    const p2Val = Math.min(100, Math.max(0, p2Prestige ?? gameState.p2.prestige ?? 0));
+
+    if (p1NameEl) p1NameEl.textContent = p1Char.name || 'JUGADOR 1';
+    if (p2NameEl) p2NameEl.textContent = p2Char.name || 'JUGADOR 2';
+    if (p1PresEl) p1PresEl.textContent = p1Val;
+    if (p2PresEl) p2PresEl.textContent = p2Val;
+
+    const renderWinnerBlock = (winner, flipSprite = false, winnerPlayerKey = 'p1') => {
+      const isP1 = winnerPlayerKey === 'p1';
+      if (winnerTagEl) {
+        winnerTagEl.textContent = isP1 ? '1P CAMPEÓN' : (gameState.currentGameMode === 'vs-ai' ? 'CPU CAMPEÓN' : '2P CAMPEÓN');
+        winnerTagEl.style.backgroundColor = winner.color;
+      }
+      if (winnerNameEl) {
+        winnerNameEl.textContent = `${winner.name} CONQUISTA LA CIMA`;
+        winnerNameEl.style.color = winner.color;
+      }
+      if (crownEl) {
+        crownEl.textContent = '👑';
+      }
+
+      if (faceWrapper) {
+        faceWrapper.style.borderColor = winner.borderColor || winner.color;
+        // Priorizar characterSprite / fullPortrait para que luzca imponente en el podio
+        const spriteSrc = winner.characterSprite || winner.fullPortrait || winner.animSprite || winner.iconSprite || winner.faceSprite;
+        if (spriteSrc) {
+          faceWrapper.innerHTML = `<img src="${spriteSrc}" alt="${winner.name}" class="go-winner-full-sprite"${flipSprite ? ' style="transform: scaleX(-1);"' : ''}>`;
+        } else {
+          faceWrapper.innerHTML = `<div class="go-winner-square" style="background: ${winner.color}; border: 3px solid ${winner.borderColor}"><span>${winner.name[0]}</span></div>`;
+        }
+      }
+
+      if (p1Col && p2Col) {
+        p1Col.classList.toggle('winner-col', isP1);
+        p1Col.classList.toggle('loser-col', !isP1);
+        p2Col.classList.toggle('winner-col', !isP1);
+        p2Col.classList.toggle('loser-col', isP1);
+      }
+
+      if (this.goFlavor) {
+        this.goFlavor.textContent = winner.quote || `La vibra arrolladora de ${winner.name} resuena en todo el escenario musical.`;
+      }
+    };
+
+    if (p1Val === p2Val) {
+      // EMPATE
+      if (winnerTagEl) {
+        winnerTagEl.textContent = 'EMPATE';
+        winnerTagEl.style.backgroundColor = DRAW_RESULT.color;
+      }
+      if (winnerNameEl) {
+        winnerNameEl.textContent = DRAW_RESULT.headline;
+        winnerNameEl.style.color = DRAW_RESULT.color;
+      }
+      if (crownEl) {
+        crownEl.textContent = '⚔️';
       }
       if (faceWrapper) {
         faceWrapper.style.borderColor = DRAW_RESULT.borderColor;
-        const p1Face = p1Char.faceSprite ? `<img src="${p1Char.faceSprite}" class="go-winner-face">` : `<div class="go-winner-square" style="background: ${p1Char.color}">${p1Char.name[0]}</div>`;
-        const p2Face = p2Char.faceSprite ? `<img src="${p2Char.faceSprite}" class="go-winner-face" style="transform: scaleX(-1);">` : `<div class="go-winner-square" style="background: ${p2Char.color}">${p2Char.name[0]}</div>`;
-        faceWrapper.innerHTML = `
-          ${p1Face}
-          <span class="draw-vs-symbol">⚡</span>
-          ${p2Face}
-        `;
+        const s1 = p1Char.characterSprite || p1Char.iconSprite || p1Char.faceSprite;
+        const s2 = p2Char.characterSprite || p2Char.iconSprite || p2Char.faceSprite;
+        const p1Face = s1 ? `<img src="${s1}" class="go-winner-face">` : `<div class="go-winner-square" style="background: ${p1Char.color}">${p1Char.name[0]}</div>`;
+        const p2Face = s2 ? `<img src="${s2}" class="go-winner-face" style="transform: scaleX(-1);">` : `<div class="go-winner-square" style="background: ${p2Char.color}">${p2Char.name[0]}</div>`;
+        faceWrapper.innerHTML = `<div class="draw-faces-wrap">${p1Face}<span class="draw-vs-symbol">⚡</span>${p2Face}</div>`;
       }
-      if (this.goFlavor) this.goFlavor.textContent = DRAW_RESULT.flavor;
-
-    } else if (p2Prestige > p1Prestige) {
-      // GANA P2
-      const winner = p2Char;
-      const titleText = `${winner.name} DOMINA LAS PLAYLISTS`;
-      const flavorText = `La vibra y actitud de ${winner.name} arrasan en la cima musical.`;
-
-      if (this.goWinnerBadge) {
-        this.goWinnerBadge.textContent = titleText;
-        this.goWinnerBadge.style.color = winner.color;
-        this.goWinnerBadge.style.borderColor = winner.borderColor;
+      if (p1Col && p2Col) {
+        p1Col.classList.remove('winner-col', 'loser-col');
+        p2Col.classList.remove('winner-col', 'loser-col');
       }
-      if (faceWrapper) {
-        faceWrapper.style.borderColor = winner.borderColor;
-        if (winner.faceSprite) {
-          faceWrapper.innerHTML = `<img src="${winner.faceSprite}" alt="${winner.name}" class="go-winner-face" style="transform: scaleX(-1);">`;
-        } else {
-          faceWrapper.innerHTML = `<div class="go-winner-square" style="background: ${winner.color}; border: 3px solid ${winner.borderColor}"><span>${winner.name[0]}</span></div>`;
-        }
+      if (this.goFlavor) {
+        this.goFlavor.textContent = DRAW_RESULT.flavor || 'Un duelo legendario donde ambos artistas igualaron su nivel de energía sonora.';
       }
-      if (this.goFlavor) this.goFlavor.textContent = flavorText;
-
+    } else if (p2Val > p1Val) {
+      renderWinnerBlock(p2Char, true, 'p2');
     } else {
-      // GANA P1
-      const winner = p1Char;
-      const titleText = `${winner.name} DOMINA LAS PLAYLISTS`;
-      const flavorText = `La vibra y actitud de ${winner.name} arrasan en la cima musical.`;
-
-      if (this.goWinnerBadge) {
-        this.goWinnerBadge.textContent = titleText;
-        this.goWinnerBadge.style.color = winner.color;
-        this.goWinnerBadge.style.borderColor = winner.borderColor;
-      }
-      if (faceWrapper) {
-        faceWrapper.style.borderColor = winner.borderColor;
-        if (winner.faceSprite) {
-          faceWrapper.innerHTML = `<img src="${winner.faceSprite}" alt="${winner.name}" class="go-winner-face">`;
-        } else {
-          faceWrapper.innerHTML = `<div class="go-winner-square" style="background: ${winner.color}; border: 3px solid ${winner.borderColor}"><span>${winner.name[0]}</span></div>`;
-        }
-      }
-      if (this.goFlavor) this.goFlavor.textContent = flavorText;
+      renderWinnerBlock(p1Char, false, 'p1');
     }
   }
 }
