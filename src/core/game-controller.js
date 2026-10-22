@@ -2,10 +2,11 @@
 // CONTROLADOR DE PARTIDA Y CICLO DE JUEGO (GAME CONTROLLER)
 // ===================================================
 
-import { PHASES, KILL_TENSION, gameState, getHpForDiceRoll, getPawnEmoji, getPawnSprite, getUnitTypeForDiceRoll, getUnitTemplate, getStrongestUnit, getWeakestUnit } from './state.js';
+import { PHASES, gameState, getPawnEmoji, getPawnSprite, getUnitTypeForDiceRoll, getUnitTemplate, getStrongestUnit, getWeakestUnit, getKillTension, applyDamageToPawn } from './state.js';
 import { calculateAttackArea, evaluateCellStates } from './grid.js';
 import { chooseBotPawnPosition, chooseBotAttackTarget, decideBotAction } from './ai.js';
-import { CONTROLS } from '../data/controls.js';
+import { CONTROLS, getControlScheme, CONTROL_SCHEMES } from '../data/controls.js';
+import { CHARACTERS } from '../data/characters.js';
 import { getDiceSprite } from '../data/patterns.js';
 import { screens } from '../ui/screens.js';
 import { feedback } from '../ui/feedback.js';
@@ -40,15 +41,21 @@ export class GameController {
   iniciarPartidaDinamica(mode, p1Char = null, p2Char = null) {
     this.currentGameMode = mode;
 
+    // Regla: No puede haber enfrentamientos mirror (incluso para futuros personajes)
+    if (p1Char && p2Char && p1Char.id === p2Char.id) {
+      const altChar = CHARACTERS.find(c => c.isPlayable && c.id !== p1Char.id);
+      if (altChar) p2Char = altChar;
+    }
+
     if (p1Char) {
       gameState.p1.character = p1Char;
       gameState.p1.maxAbilityCharges = p1Char.activeAbility?.maxCharges || 1;
-      gameState.p1.activeAbilityCharges = p1Char.activeAbility?.initialCharges ?? 0;
+      gameState.p1.activeAbilityCharges = p1Char.activeAbility?.initialCharges ?? p1Char.activeAbility?.maxCharges ?? 1;
     }
     if (p2Char) {
       gameState.p2.character = p2Char;
       gameState.p2.maxAbilityCharges = p2Char.activeAbility?.maxCharges || 1;
-      gameState.p2.activeAbilityCharges = p2Char.activeAbility?.initialCharges ?? 0;
+      gameState.p2.activeAbilityCharges = p2Char.activeAbility?.initialCharges ?? p2Char.activeAbility?.maxCharges ?? 1;
     }
 
     // 1. Montar pantalla de juego en el DOM
@@ -85,6 +92,13 @@ export class GameController {
             const targetPlayer = opt.closest('#p2-curtain') ? 'p1' : (opt.closest('#p1-curtain') && this.currentGameMode !== 'vs-ai' ? 'p2' : 'p1');
             if (action) this.seleccionarAccionCombate(targetPlayer, action);
           }
+        } else if (gameState.currentPhase === PHASES.PHASE_1_PLACEMENT) {
+          if (!gameState.p1.pendingPawn) {
+            this.handleReadyInput('p1');
+          }
+        } else if (gameState.currentPhase === PHASES.PHASE_2_ATTACK) {
+          const targetPlayer = this.currentGameMode !== 'vs-ai' ? 'p2' : 'p1';
+          this.handleReadyInput(targetPlayer);
         }
       });
     }
@@ -102,6 +116,12 @@ export class GameController {
             const targetPlayer = opt.closest('#p2-curtain') ? 'p1' : 'p2';
             if (action) this.seleccionarAccionCombate(targetPlayer, action);
           }
+        } else if (gameState.currentPhase === PHASES.PHASE_1_PLACEMENT) {
+          if (this.currentGameMode !== 'vs-ai' && !gameState.p2.pendingPawn) {
+            this.handleReadyInput('p2');
+          }
+        } else if (gameState.currentPhase === PHASES.PHASE_2_ATTACK) {
+          this.handleReadyInput('p1');
         }
       });
     }
@@ -165,7 +185,8 @@ export class GameController {
 
     // FASE PREPARACIÓN
     if (gameState.currentPhase === PHASES.WARNING_PLACEMENT) {
-      if ((player === 'p1' && key === 's') || (player === 'p2' && key === 'k')) {
+      if ((player === 'p1' && (key === ' ' || key === 'space' || key === 's')) ||
+        (player === 'p2' && (key === 'enter' || key === 'k'))) {
         this.confirmarJugadorListo(player);
       }
       return;
@@ -193,7 +214,7 @@ export class GameController {
 
       feedback.renderPawns(this.p1GridMatrix, gameState.p1.pawns, this.p2GridMatrix, gameState.p2.pawns, this.currentGameMode);
       soundManager.playPawnPlaceSound();
-      feedback.updateRoundDrawer('TITÁN COLOCADO [MARCA LISTO]', 'placement');
+      feedback.updateRoundDrawer('TITÁN', 'titan');
     }
 
     // FASE 1: Colocar unidad o mejorar unidad si el tablero está lleno
@@ -291,7 +312,7 @@ export class GameController {
         const targetMatrix = player === 'p1' ? this.p2GridMatrix : this.p1GridMatrix;
         feedback.updateAttackHighlights(targetMatrix, [{ row, col }]);
         soundManager.playPawnPlaceSound();
-        feedback.showReactionBadge(player, '🎯 OBJETIVO DE AGARRE FIJADO', 'show-hit');
+        feedback.showReactionBadge(player, 'OBJETIVO DE AGARRE FIJADO', 'show-hit');
         return;
       }
 
@@ -305,14 +326,87 @@ export class GameController {
     }
   }
 
+  // ================= PASIVAS DE INICIO DE RONDA DE COMBATE =================
+  ejecutarPasivasDeRonda() {
+    let changed = false;
+
+    // Aplicar pasivas "Cada ronda" (Cyborg Medio, Swarm Medio)
+    ['p1', 'p2'].forEach(playerKey => {
+      const pState = gameState[playerKey];
+      if (!pState || !pState.character) return;
+      const charId = pState.character.id;
+      const living = pState.pawns.filter(p => p && p.hp > 0);
+      if (living.length === 0) return;
+
+      // Cyborg Medio: "Cada ronda, otorga escudo a una unidad adyacente"
+      if (charId === 'cyborg') {
+        const mediums = living.filter(p => p.unitType === 'mediana');
+        mediums.forEach(med => {
+          // Priorizar aliados adyacentes que NO tengan escudo activo (máx 1 escudo por unidad)
+          const adjAllies = living.filter(p =>
+            p.id !== med.id &&
+            Math.abs(p.row - med.row) <= 1 && Math.abs(p.col - med.col) <= 1
+          );
+          if (adjAllies.length > 0) {
+            const unshielded = adjAllies.filter(p => !p.shield || p.shield <= 0);
+            const pool = unshielded.length > 0 ? unshielded : adjAllies;
+            const tgt = pool[Math.floor(Math.random() * pool.length)];
+            tgt.shield = 1; // Tope de 1 escudo según reglas de duración de 1 ronda
+            tgt.shieldExpiresAtRound = gameState.roundNumber;
+            feedback.animateShieldGrant(playerKey, tgt.row, tgt.col, 1);
+            feedback.showReactionBadge(playerKey, '️ CENTINELA: ESCUDO ADYACENTE', 'show-dodge');
+            changed = true;
+          }
+        });
+
+        // Cyborg Pequeño: "Si tiene unidades adyacentes, gana 1 de ataque"
+        const smalls = living.filter(p => p.unitType === 'pequena');
+        smalls.forEach(small => {
+          const adjUnits = living.filter(p =>
+            p.id !== small.id &&
+            Math.abs(p.row - small.row) <= 1 && Math.abs(p.col - small.col) <= 1
+          );
+          if (adjUnits.length > 0) {
+            small.atk = (small.atk || 0) + 1;
+            feedback.showReactionBadge(playerKey, 'CIBERMUÑECO: +1 ATAQUE (ADY)', 'show-dodge');
+            feedback.animateStatBuff(playerKey, small.row, small.col, 'atk', 1);
+            changed = true;
+          }
+        });
+      }
+
+      // Swarm Medio: "Cada ronda, añade 1 de daño a un dron adyacente"
+      if (charId === 'dron_enjambre') {
+        const mediums = living.filter(p => p.unitType === 'mediana');
+        mediums.forEach(med => {
+          const adjDrones = living.filter(p =>
+            p.id !== med.id &&
+            Math.abs(p.row - med.row) <= 1 && Math.abs(p.col - med.col) <= 1
+          );
+          if (adjDrones.length > 0) {
+            const tgt = adjDrones[Math.floor(Math.random() * adjDrones.length)];
+            tgt.atk = (tgt.atk || 0) + 1;
+            feedback.showReactionBadge(playerKey, 'NODRIZA: +1 ATAQUE A DRON', 'show-dodge');
+            changed = true;
+          }
+        });
+      }
+    });
+
+    if (changed) {
+      feedback.renderPawns(this.p1GridMatrix, gameState.p1.pawns, this.p2GridMatrix, gameState.p2.pawns, this.currentGameMode);
+    }
+  }
+
   // ================= SELECCIÓN DE ACCIÓN (A/D o J/L) =================
   mostrarOverlaySeleccionAccion(player) {
     const pState = gameState[player];
     if (!pState || !pState.character) return;
 
     const isP1 = player === 'p1';
-    const normalKey = isP1 ? 'A' : 'J';
-    const abilityKey = isP1 ? 'D' : 'L';
+    const isDanceMat = getControlScheme() === CONTROL_SCHEMES.DANCE_MAT;
+    const normalKey = isDanceMat ? '⬅' : (isP1 ? 'A' : 'J');
+    const abilityKey = isDanceMat ? '➡' : (isP1 ? 'D' : 'L');
     const char = pState.character;
     const abilityName = char.activeAbility?.name || 'Habilidad';
     const maxCharges = pState.maxAbilityCharges || char.activeAbility?.maxCharges || 1;
@@ -322,17 +416,27 @@ export class GameController {
     const isAttackSelected = pState.selectedAction === 'attack';
     const isAbilitySelected = pState.selectedAction === 'ability';
 
+    const abilityIconSrc = canUseAbility
+      ? '/assets/sprites/UI/UI_Hero_Skill.svg'
+      : '/assets/sprites/UI/UI_Hero_Skill_empty.svg';
+
+    const attackIconSrc = '/assets/sprites/UI/UI_PawnIcon_Atk.svg';
+
     const customKeyHTML = `
-      <div class="curtain-action-choices" id="${player}-action-choices">
+      <div class="curtain-action-choices ${isDanceMat ? 'mat-action-choices' : ''}" id="${player}-action-choices">
         <div class="curtain-action-opt ${isAttackSelected ? 'action-selected' : ''}" data-action="attack" title="Ataque básico normal">
-          <div class="action-opt-key">${normalKey}</div>
-          <div class="action-opt-label">ATAQUE</div>
-          <div class="action-opt-sub">1 Casilla (1 Daño)</div>
+          <div class="action-icon-badge">
+            <img src="${attackIconSrc}" class="action-badge-svg" alt="Ataque" draggable="false" />
+            <span class="action-badge-key ${isDanceMat ? 'mat-badge-key' : ''}">${normalKey}</span>
+          </div>
+          <div class="action-opt-label">- ATAQUE -</div>
         </div>
-        <div class="curtain-action-opt ${isAbilitySelected ? 'action-selected' : ''} ${!canUseAbility ? 'action-disabled' : ''}" data-action="ability" title="${abilityName}">
-          <div class="action-opt-key">${abilityKey}</div>
-          <div class="action-opt-label">${abilityName.toUpperCase()}</div>
-          <div class="action-opt-sub">⚡ ${charges}/${maxCharges} (1 CARGA)</div>
+        <div class="curtain-action-opt ${isAbilitySelected ? 'action-selected' : ''} ${!canUseAbility ? 'action-disabled' : ''}" data-action="ability" title="${abilityName} (${charges}/${maxCharges} cargas)">
+          <div class="action-icon-badge">
+            <img src="${abilityIconSrc}" class="action-badge-svg ${!canUseAbility ? 'badge-empty' : ''}" alt="${abilityName}" draggable="false" />
+            <span class="action-badge-key ${isDanceMat ? 'mat-badge-key' : ''}">${abilityKey}</span>
+          </div>
+          <div class="action-opt-label">- HABILIDAD -</div>
         </div>
       </div>
     `;
@@ -361,7 +465,7 @@ export class GameController {
 
     if (actionType === 'ability') {
       if ((pState.activeAbilityCharges ?? 0) < 1) {
-        feedback.showReactionBadge(player, `⚡ REQUIERE 1 CARGA (${pState.activeAbilityCharges ?? 0} disp.)`, 'show-hit');
+        feedback.showReactionBadge(player, `REQUIERE 1 CARGA (${pState.activeAbilityCharges ?? 0} disp.)`, 'show-hit');
         soundManager.playMissBothSound();
         this.mostrarOverlaySeleccionAccion(player);
         return;
@@ -372,9 +476,6 @@ export class GameController {
     }
   }
 
-  verificarAmbosListosParaCombate() {
-    this.verificarAmbosListosParaAvanzar();
-  }
 
   iniciarRondaDeAtaque() {
     ['p1', 'p2'].forEach(playerKey => {
@@ -397,13 +498,13 @@ export class GameController {
           }
         }
         feedback.updateAttackHighlights(enemyMatrix, pState.targetedCells);
-        feedback.showReactionBadge(playerKey, '⚔️ ATAQUE PREPARADO', 'show-dodge');
+        feedback.showReactionBadge(playerKey, '️ ATAQUE PREPARADO', 'show-dodge');
       } else if (pState.selectedAction === 'ability') {
         if (char.id === 'cyborg') {
           pState.isCyborgBoosted = true;
           const extraDamage = Math.floor((pState.prestige || 0) / 20);
           const totalDamage = 1 + extraDamage;
-          feedback.showAbilityActivation(playerKey, `⚡ FINISHER ARMADO: ${totalDamage} DAÑO`);
+          feedback.showAbilityActivation(playerKey, `BIOIMPACTO ARMADO: ${totalDamage} DAÑO`);
           if (!pState.attackTarget) {
             if (playerKey === 'p1') {
               pState.attackTarget = { row: 1, col: 1 };
@@ -415,16 +516,8 @@ export class GameController {
             }
           }
           feedback.updateAttackHighlights(enemyMatrix, pState.targetedCells);
-        } else if (char.id === 'incinerador') {
-          feedback.showAbilityActivation(playerKey, '🔥 HORNO: CONSUMIR TODA LA CHATARRA');
-          pState.attackTarget = null;
-          pState.targetedCells = [];
-        } else if (char.id === 'dron_enjambre') {
-          feedback.showAbilityActivation(playerKey, '🐝 SACRIFICIO DE DRONES PREPARADO');
-          pState.attackTarget = null;
-          pState.targetedCells = [];
         } else if (char.id === 'el_brazo') {
-          feedback.showAbilityActivation(playerKey, '🤖 ELIGE ENEMIGO PARA REUBICAR');
+          feedback.showAbilityActivation(playerKey, 'DESPLAZAR: ELIGE ENEMIGO A MOVER');
           if (!pState.abilityTarget) {
             const livingEnemies = gameState[enemyKey].pawns.filter(p => p && p.hp > 0);
             if (livingEnemies.length > 0) {
@@ -433,19 +526,37 @@ export class GameController {
               feedback.updateAttackHighlights(enemyMatrix, [{ row: targetP.row, col: targetP.col }]);
             }
           }
-        } else if (char.id === 'taladro') {
-          feedback.showAbilityActivation(playerKey, '⛏️ FALLA TECTÓNICA: 1 DAÑO A TODOS');
+        } else {
+          // Habilidades que NO requieren elegir casilla enemiga (Incinerador, Swarm, Taladro, Holo):
           pState.attackTarget = null;
           pState.targetedCells = [];
-        } else if (char.id === 'holo') {
-          feedback.showAbilityActivation(playerKey, '🌀 CONVERTIR ESCUDOS EN +1/+1');
-          pState.attackTarget = null;
-          pState.targetedCells = [];
+
+          if (char.id === 'incinerador') {
+            feedback.showAbilityActivation(playerKey, 'CALCINAR: CONSUMIR TODA LA CHATARRA');
+          } else if (char.id === 'dron_enjambre') {
+            feedback.showAbilityActivation(playerKey, 'PEM: DETONAR TODOS LOS DRONES');
+          } else if (char.id === 'taladro') {
+            feedback.showAbilityActivation(playerKey, '️ TERRAFORMAR: 1 DAÑO A TODOS');
+          } else if (char.id === 'holo') {
+            feedback.showAbilityActivation(playerKey, 'PRESTIGIO: CONVERTIR ESCUDOS EN +1/+1');
+          }
+
+          // Para jugadores humanos (no CPU lista), mostrar telón de Listo con overlay simplificado
+          const isAI = this.currentGameMode === 'vs-ai' && playerKey === 'p2';
+          const isPlayerReady = playerKey === 'p1' ? this.p1Ready : this.p2Ready;
+          const targetCurtain = playerKey === 'p1' ? 'p2' : 'p1';
+
+          if (!isAI && !isPlayerReady) {
+            const abilityName = char.activeAbility?.name || 'Habilidad';
+            const abilityDesc = char.activeAbility?.description || 'Habilidad preparada';
+            const abilityIcon = '/assets/sprites/UI/UI_Hero_Skill.svg';
+            feedback.setBoardCurtain(targetCurtain, 'black', abilityName, abilityIcon, abilityDesc, false);
+          }
         }
       }
     });
 
-    feedback.updateRoundDrawer(`RONDA DE ATAQUE LISTA [MARCA LISTO]`, 'attack');
+    feedback.updateRoundDrawer('ATACAR', 'attack');
   }
 
   // ================= ACTIVAR O DESACTIVAR HABILIDAD =================
@@ -471,7 +582,6 @@ export class GameController {
         this.p2Ready = (this.currentGameMode === 'vs-ai');
         feedback.hideBigCountdown();
         feedback.updateKeyTags('placement', this.currentGameMode);
-        feedback.removeStandingPawnIcons();
         feedback.setBoardCurtain('p1', 'black', 'TIRAR DADO', 'face');
 
         if (this.currentGameMode === 'vs-ai') {
@@ -480,8 +590,8 @@ export class GameController {
           feedback.setBoardCurtain('p2', 'black', 'TIRAR DADO', 'face');
         }
         feedback.updateReadyCheckboxes(this.p1Ready, this.p2Ready, this.currentGameMode);
-        feedback.updateRoundUI(gameState.roundNumber, 'placement');
-        feedback.updateRoundDrawer('TIRAR DADO: [ESPACIO] P1 / [ENTER] P2', 'placement');
+        feedback.updateRoundUI(gameState.roundNumber, 'dice');
+        feedback.updateRoundDrawer('DADO', 'dice');
         break;
 
       case PHASES.ROUND_0_PLACEMENT: {
@@ -491,7 +601,8 @@ export class GameController {
         feedback.hideBigCountdown();
         feedback.setBoardCurtain('both', 'hide');
         feedback.updateKeyTags('placement', this.currentGameMode);
-        feedback.updateRoundUI(0, 'placement');
+        feedback.updateRoundUI(0, 'titan');
+        feedback.updateRoundDrawer('TITÁN', 'titan');
 
         // Generar 1 Titán con las estadísticas específicas de su sintético
         const createTitan = (playerKey) => {
@@ -510,8 +621,6 @@ export class GameController {
         this.round0State.p1 = { titan: createTitan('p1'), placed: false };
         this.round0State.p2 = { titan: createTitan('p2'), placed: false };
 
-        const p1Titan = this.round0State.p1.titan;
-        feedback.updateRoundDrawer(`COLOCAR TITÁN 👑 (${p1Titan.atk}/${p1Titan.hp})`, 'placement');
         feedback.highlightFreeCells(this.p1GridMatrix, []);
 
         if (this.currentGameMode === 'vs-ai') {
@@ -535,8 +644,8 @@ export class GameController {
         feedback.updateReadyCheckboxes(false, false, this.currentGameMode, true);
         feedback.hideBigCountdown();
         feedback.setBoardCurtain('both', 'hide');
-        feedback.updateRoundUI(gameState.roundNumber, 'placement');
-        feedback.updateRoundDrawer('LANZANDO DADOS...', 'placement');
+        feedback.updateRoundUI(gameState.roundNumber, 'dice');
+        feedback.updateRoundDrawer('DADO', 'dice');
 
         this.ejecutarTiradaDadosOverlay(() => {
           this.cambiarFase(PHASES.PHASE_1_PLACEMENT);
@@ -550,20 +659,19 @@ export class GameController {
         feedback.setBoardCurtain('both', 'hide');
         feedback.updateKeyTags('placement', this.currentGameMode);
         feedback.updateRoundUI(gameState.roundNumber, 'placement');
+        feedback.updateRoundDrawer('COLOCAR', 'placement');
 
         const p1Pending = gameState.p1.pendingPawn;
         const p1Pawns = gameState.p1.pawns.filter(p => p && p.hp > 0);
 
         if (p1Pending) {
-          const emoji = getPawnEmoji(p1Pending.hp);
-          if (p1Pawns.length >= 9) {
-            feedback.updateRoundDrawer(`TABLERO LLENO: SELECCIONA UNIDAD (+${p1Pending.hp} HP)`, 'placement');
-          } else {
-            feedback.updateRoundDrawer(`COLOCAR ${emoji} (${p1Pending.hp} HP)`, 'placement');
-          }
           feedback.highlightFreeCells(this.p1GridMatrix, p1Pawns);
         } else {
-          feedback.updateRoundDrawer('HABILIDAD TITÁN ACTIVADA', 'placement');
+          const p1Char = gameState.p1.character;
+          const titanName = p1Char?.titanAbility?.name || 'HABILIDAD TITÁN';
+          const titanDesc = p1Char?.titanAbility?.description || 'Efecto de Titán ejecutado';
+          const titanIcon = '/assets/sprites/UI/Dado_spr_6.png';
+          feedback.setBoardCurtain('p1', 'black', titanName, titanIcon, titanDesc, false);
         }
 
         if (this.currentGameMode === 'vs-ai') {
@@ -586,6 +694,12 @@ export class GameController {
           const p2Pawns = gameState.p2.pawns.filter(p => p && p.hp > 0);
           if (p2Pending) {
             feedback.highlightFreeCells(this.p2GridMatrix, p2Pawns);
+          } else {
+            const p2Char = gameState.p2.character;
+            const titanName2 = p2Char?.titanAbility?.name || 'HABILIDAD TITÁN';
+            const titanDesc2 = p2Char?.titanAbility?.description || 'Efecto de Titán ejecutado';
+            const titanIcon = '/assets/sprites/UI/Dado_spr_6.png';
+            feedback.setBoardCurtain('p2', 'black', titanName2, titanIcon, titanDesc2, false);
           }
         }
 
@@ -611,12 +725,15 @@ export class GameController {
         feedback.updateKeyTags('attack', this.currentGameMode);
         feedback.clearDiceOverlays();
         feedback.updateRoundUI(gameState.roundNumber, 'attack');
-        feedback.updateRoundDrawer('ELIGE ACCIÓN: [A] ATACAR O [D] HABILIDAD', 'attack');
+        feedback.updateRoundDrawer('ATACAR', 'attack');
 
         // Resetear selección de acción por defecto a 'attack'
         gameState.p1.selectedAction = 'attack';
         gameState.p2.selectedAction = 'attack';
         feedback.updateAbilitySelectionUI('both', false);
+
+        // Ejecutar pasivas de inicio de ronda de combate (Holo otorga escudo, Cyborg medio, Swarm medio)
+        this.ejecutarPasivasDeRonda();
 
         // Mostrar overlay de selección de acción en el tablero para P1
         this.mostrarOverlaySeleccionAccion('p1');
@@ -663,8 +780,8 @@ export class GameController {
         feedback.hideBigCountdown();
         feedback.setBoardCurtain('both', 'hide');
         feedback.updateKeyTags('placement');
-        feedback.updateRoundUI(gameState.roundNumber, 'attack');
-        feedback.updateRoundDrawer('RESOLUCIÓN', 'attack');
+        feedback.updateRoundUI(gameState.roundNumber, 'resolution');
+        feedback.updateRoundDrawer('RESOLUCIÓN', 'resolution');
         this.ejecutarResolucionCombate();
         break;
 
@@ -678,8 +795,8 @@ export class GameController {
   // ================= CONTROL DE LISTO Y AVANCE DE FASES =================
   handleReadyInput(player) {
     if (gameState.currentPhase === PHASES.RESOLUTION ||
-        gameState.currentPhase === PHASES.PHASE_DICE_ROLL ||
-        gameState.currentPhase === PHASES.GAME_OVER) {
+      gameState.currentPhase === PHASES.PHASE_DICE_ROLL ||
+      gameState.currentPhase === PHASES.GAME_OVER) {
       return;
     }
 
@@ -704,6 +821,15 @@ export class GameController {
       } else {
         feedback.setBoardCurtain(player, 'black', 'TIRAR DADO', 'face');
       }
+    } else if (gameState.currentPhase === PHASES.PHASE_1_PLACEMENT) {
+      const pState = gameState[player];
+      if (!pState?.pendingPawn) {
+        if (isReady) {
+          feedback.setBoardCurtain(player, 'green', '¡LISTO!', 'face');
+        } else {
+          this.cambiarFase(PHASES.PHASE_1_PLACEMENT);
+        }
+      }
     } else if (gameState.currentPhase === PHASES.PHASE_ACTION_SELECT) {
       const targetCurtain = player === 'p1' ? 'p2' : 'p1';
       this[player + 'ActionReady'] = isReady;
@@ -711,6 +837,17 @@ export class GameController {
         feedback.setBoardCurtain(targetCurtain, 'green', '¡LISTO!', 'face');
       } else {
         this.mostrarOverlaySeleccionAccion(player);
+      }
+    } else if (gameState.currentPhase === PHASES.PHASE_2_ATTACK) {
+      const pState = gameState[player];
+      const isSpecialAbility = pState?.selectedAction === 'ability' && ['incinerador', 'dron_enjambre', 'taladro', 'holo'].includes(pState.character?.id);
+      if (isSpecialAbility) {
+        const targetCurtain = player === 'p1' ? 'p2' : 'p1';
+        if (isReady) {
+          feedback.setBoardCurtain(targetCurtain, 'green', '¡LISTO!', 'face');
+        } else {
+          this.iniciarRondaDeAtaque();
+        }
       }
     }
 
@@ -775,10 +912,7 @@ export class GameController {
     }, 250);
   }
 
-  // Avanzar manualmente (alias retrocompatible)
-  avanzarPorEspacio() {
-    this.handleReadyInput('p1');
-  }
+
 
   // Tirada animada de dados d6
   ejecutarTiradaDadosOverlay(onFinished) {
@@ -858,7 +992,8 @@ export class GameController {
                 strongest.atk = (strongest.atk || 0) + 1;
                 strongest.hp += 1;
                 strongest.maxHp += 1;
-                feedback.showReactionBadge(playerKey, '👑 +1/+1 A UNIDAD MÁS FUERTE', 'show-dodge');
+                feedback.showReactionBadge(playerKey, '+1/+1 A UNIDAD MÁS FUERTE', 'show-dodge');
+                feedback.animateStatBuff(playerKey, strongest.row, strongest.col, 'all', 1);
                 p.pendingPawn = null;
                 return { isTitanBoost: true, hp: 0, pendingPawn: null, playerKey };
               } else {
@@ -902,7 +1037,7 @@ export class GameController {
         if (p2RollDiceImg) p2RollDiceImg.src = getDiceSprite(rawRoll2);
 
         if (res1.isTitanBoost) {
-          if (p1PawnHpText) p1PawnHpText.textContent = '👑 HABILIDAD TITÁN';
+          if (p1PawnHpText) p1PawnHpText.textContent = 'HABILIDAD TITÁN';
           if (p1PawnImg) p1PawnImg.src = getPawnSprite('titan', 'p1');
         } else {
           if (p1PawnImg) p1PawnImg.src = getPawnSprite(res1.pendingPawn || res1.hp, 'p1');
@@ -910,7 +1045,7 @@ export class GameController {
         }
 
         if (res2.isTitanBoost) {
-          if (p2PawnHpText) p2PawnHpText.textContent = '👑 HABILIDAD TITÁN';
+          if (p2PawnHpText) p2PawnHpText.textContent = 'HABILIDAD TITÁN';
           if (p2PawnImg) p2PawnImg.src = getPawnSprite('titan', 'p2');
         } else {
           if (p2PawnImg) p2PawnImg.src = getPawnSprite(res2.pendingPawn || res2.hp, 'p2');
@@ -957,13 +1092,14 @@ export class GameController {
           pState.hornoCount = (pState.hornoCount || 0) + 1;
         });
 
-        feedback.showReactionBadge(playerKey, `🔥 TITÁN 6: ${toConsume.length} CHATARRAS AL HORNO`, 'show-dodge');
+        feedback.showReactionBadge(playerKey, `TITÁN 6: ${toConsume.length} CHATARRAS AL HORNO`, 'show-dodge');
 
         // Comprobar si detona
         while (pState.hornoCount >= 3) {
           pState.hornoCount -= 3;
           this.detonarHorno(playerKey);
         }
+        feedback.updateAbilityChargesUI(playerKey);
         return true;
       }
 
@@ -993,7 +1129,7 @@ export class GameController {
             }
           }
         }
-        feedback.showReactionBadge(playerKey, '🐝 TITÁN 6: +2 DRONES GENERADOS', 'show-dodge');
+        feedback.showReactionBadge(playerKey, 'TITÁN 6: +2 DRONES GENERADOS', 'show-dodge');
         return true;
       }
 
@@ -1001,7 +1137,7 @@ export class GameController {
         // Cyborg: ganas 5 de tensión
         gameState.addPrestige(playerKey, 5);
         feedback.updatePrestigeUI(playerKey, pState.prestige);
-        feedback.showReactionBadge(playerKey, '⚡ TITÁN 6: +5 DE TENSIÓN', 'show-dodge');
+        feedback.showReactionBadge(playerKey, 'TITÁN 6: +5 DE TENSIÓN', 'show-dodge');
         const titan = pState.pawns.find(p => p && p.isTitan && p.hp > 0);
         if (titan) {
           feedback.spawnSquareTensionParticles(titan, playerKey, 5);
@@ -1023,7 +1159,7 @@ export class GameController {
           ally.col = tempC;
           titan.atk = (titan.atk || 0) + 1;
           ally.atk = (ally.atk || 0) + 1;
-          feedback.showReactionBadge(playerKey, '🤖 TITÁN 6: ENROQUE Y +1 ATAQUE A AMBOS', 'show-dodge');
+          feedback.showReactionBadge(playerKey, 'TITÁN 6: ENROQUE Y +1 ATAQUE A AMBOS', 'show-dodge');
           return true;
         }
         return false;
@@ -1031,24 +1167,198 @@ export class GameController {
 
       case 'taladro': {
         // Taladro: cura completamente a la unidad con menos vida
-        const weakest = getWeakestUnit(pState.pawns);
-        if (weakest && weakest.hp < weakest.maxHp) {
-          weakest.hp = weakest.maxHp;
-          feedback.showReactionBadge(playerKey, `⛏️ TITÁN 6: CURA COMPLETA A ${weakest.name || 'ALIADO'}`, 'show-dodge');
+        // 1. Filtrar unidades aliadas vivas que hayan sufrido daño (hp < maxHp)
+        const damagedAllies = pState.pawns.filter(p => p && p.hp > 0 && p.hp < p.maxHp);
+        if (damagedAllies.length > 0) {
+          // Ordenar por menor vida actual (y menor suma total como desempate)
+          damagedAllies.sort((a, b) => {
+            if (a.hp !== b.hp) return a.hp - b.hp;
+            const aTot = (a.atk || 0) + a.hp;
+            const bTot = (b.atk || 0) + b.hp;
+            return aTot - bTot;
+          });
+          const target = damagedAllies[0];
+          target.hp = target.maxHp;
+          feedback.showReactionBadge(playerKey, `️ TITÁN 6: CURA COMPLETA A ${target.name || 'ALIADO'}`, 'show-dodge');
+          feedback.animateStatBuff(playerKey, target.row, target.col, 'heal', target.hp);
+          if (typeof soundManager?.playPawnPlaceSound === 'function') {
+            soundManager.playPawnPlaceSound();
+          }
           return true;
         }
         return false;
       }
 
       case 'holo': {
-        // Holo: su daño se iguala a su vida
+        // Holo: su daño se iguala a su vida (inicia en 0/5 y con un 6 se iguala a su vida)
         const titan = pState.pawns.find(p => p.isTitan && p.hp > 0);
-        if (titan) titan.atk = titan.hp;
-        return false; // Al devolver false, ejecuta "+1/+1 a la unidad más fuerte"
+        if (titan) {
+          titan.atk = titan.hp;
+          feedback.showReactionBadge(playerKey, `TITÁN 6: REFLEJO VITAL (${titan.atk}/${titan.hp})`, 'show-dodge');
+          feedback.animateStatBuff(playerKey, titan.row, titan.col, 'atk', titan.atk);
+          return true; // Habilidad ejecutada con éxito (no da +1/+1 de fallback a menos que esté muerto)
+        }
+        return false;
       }
 
       default:
         return false;
+    }
+  }
+
+  // ================= MUERTE DE PEONES Y PASIVAS ON-DEATH =================
+  // BUG-4 guard: Set de IDs ya procesados para evitar recursión infinita en cadenas de muerte
+  _deathProcessingIds = new Set();
+
+  ejecutarMuerteDronSwarm(swarmPlayerKey, deadDronePawn) {
+    if (!deadDronePawn || deadDronePawn.isTitan) return;
+    const enemyKey = swarmPlayerKey === 'p1' ? 'p2' : 'p1';
+    const enemyPawns = gameState[enemyKey].pawns;
+    const enemyLiving = enemyPawns.filter(p => p && p.hp > 0);
+    if (enemyLiving.length === 0) return;
+
+    const target = enemyLiving[Math.floor(Math.random() * enemyLiving.length)];
+    const enemyMatrix = enemyKey === 'p1' ? this.p1GridMatrix : this.p2GridMatrix;
+
+    const { absorbed, actualDamage: damage, isDead } = applyDamageToPawn(target, 1);
+
+    // Disparar proyectil de partículas desde el dron que muere hacia la unidad enemiga
+    feedback.shootDirectDamageParticles(deadDronePawn, target, {
+      color: ['#ffd166', '#f59e0b', '#fbbf24', '#ffffff'],
+      fromPlayerKey: swarmPlayerKey,
+      toPlayerKey: enemyKey
+    }).then(() => {
+      feedback.showReactionBadge(swarmPlayerKey, '¡EXPLOSIÓN DE DRON! (-1)', 'show-hit');
+      feedback.animatePawnHit(enemyMatrix, target.row, target.col, isDead, target, enemyKey, damage, absorbed);
+      soundManager.playHitSound();
+
+      const targetCell = enemyMatrix[target.row] && enemyMatrix[target.row][target.col];
+      if (targetCell && targetCell.btn) {
+        targetCell.btn.classList.add('cell-damage-flash');
+        const pawnEl = targetCell.btn.querySelector('.board-pawn-unit');
+        if (pawnEl) {
+          pawnEl.classList.remove('pawn-hit-flash');
+          void pawnEl.offsetWidth;
+          pawnEl.classList.add('pawn-hit-flash');
+        }
+        setTimeout(() => targetCell.btn.classList.remove('cell-damage-flash'), 500);
+      }
+
+      if (isDead) {
+        const killTension = getKillTension(target);
+        gameState.addPrestige(swarmPlayerKey, killTension);
+        feedback.updatePrestigeUI(swarmPlayerKey, gameState[swarmPlayerKey].prestige);
+        feedback.spawnSquareTensionParticles(target, swarmPlayerKey, killTension);
+        this.procesarMuerteDePeon(enemyKey, target, swarmPlayerKey);
+        gameState[enemyKey].pawns = gameState[enemyKey].pawns.filter(p => p.hp > 0);
+      }
+
+      // Retrasar renderPawns para permitir que las animaciones de impacto y muerte se reproduzcan completamente
+      setTimeout(() => {
+        feedback.renderPawns(this.p1GridMatrix, gameState.p1.pawns, this.p2GridMatrix, gameState.p2.pawns, this.currentGameMode);
+      }, 650);
+    });
+  }
+
+  procesarMuerteDePeon(ownerKey, deadPawn, killerKey = null) {
+    if (!deadPawn) return;
+
+    // BUG-4: Evitar re-procesamiento recursivo del mismo peón
+    const deathId = deadPawn.id || `${ownerKey}_${deadPawn.row}_${deadPawn.col}`;
+    if (this._deathProcessingIds.has(deathId)) return;
+    this._deathProcessingIds.add(deathId);
+    // Limpiar después de un ciclo de eventos para permitir futuras muertes del mismo tipo
+    setTimeout(() => this._deathProcessingIds.delete(deathId), 3000);
+
+    // 1. Swarm pasiva: Al morir un dron (pequeña o mediana), hace 1 de daño a una unidad enemiga aleatoria
+    if (gameState[ownerKey]?.character?.id === 'dron_enjambre' && !deadPawn.isTitan) {
+      this.ejecutarMuerteDronSwarm(ownerKey, deadPawn);
+    }
+
+    // 2. Incinerador Medio al morir: mejora 1 HP a una chatarra aliada
+    if (gameState[ownerKey]?.character?.id === 'incinerador' && deadPawn.unitType === 'mediana') {
+      const chatarras = gameState[ownerKey].pawns.filter(p => p && p.unitType === 'pequena' && p.hp > 0);
+      if (chatarras.length > 0) {
+        const c = chatarras[0];
+        c.hp += 1;
+        c.maxHp += 1;
+        feedback.showReactionBadge(ownerKey, 'MEJORA +1 HP A CHATARRA', 'show-dodge');
+        feedback.animateStatBuff(ownerKey, c.row, c.col, 'hp', 1);
+      }
+    }
+
+    // 3. Taladro Medio al morir: otorga 1 de ataque a una unidad aliada aleatoria
+    if (gameState[ownerKey]?.character?.id === 'taladro' && deadPawn.unitType === 'mediana') {
+      const allies = gameState[ownerKey].pawns.filter(p => p && p.hp > 0 && p.id !== deadPawn.id);
+      if (allies.length > 0) {
+        const a = allies[Math.floor(Math.random() * allies.length)];
+        a.atk = (a.atk || 0) + 1;
+        feedback.showReactionBadge(ownerKey, '️ +1 ATAQUE A ALIADO', 'show-dodge');
+        feedback.animateStatBuff(ownerKey, a.row, a.col, 'atk', 1);
+      }
+    }
+
+    // 4. Taladro Pequeño al morir: realiza 1 de daño en su casilla homóloga
+    if (gameState[ownerKey]?.character?.id === 'taladro' && deadPawn.unitType === 'pequena') {
+      const enemyKey = ownerKey === 'p1' ? 'p2' : 'p1';
+      const enemyMatrix = enemyKey === 'p1' ? this.p1GridMatrix : this.p2GridMatrix;
+      const targetHomologous = { row: deadPawn.row, col: deadPawn.col, playerKey: enemyKey };
+      const opp = gameState[enemyKey].pawns.find(p => p && p.row === deadPawn.row && p.col === deadPawn.col && p.hp > 0);
+
+      // Paleta temática de taladro: ámbar, óxido metálico, naranja y blanco
+      const drillPalette = ['#f59e0b', '#d97706', '#b45309', '#fef08a', '#ffffff'];
+
+      // Disparar proyectil hacia la casilla homóloga enemiga siempre, haya o no enemigo
+      feedback.shootDirectDamageParticles(deadPawn, targetHomologous, {
+        color: drillPalette,
+        fromPlayerKey: ownerKey,
+        toPlayerKey: enemyKey,
+        count: 10,
+        duration: 320
+      }).then(() => {
+        const oppCell = enemyMatrix[deadPawn.row] && enemyMatrix[deadPawn.row][deadPawn.col];
+
+        if (opp) {
+          const { absorbed: oppAbsorbed, actualDamage: oppDmg, isDead: oppDead } = applyDamageToPawn(opp, 1);
+          feedback.showReactionBadge(ownerKey, '️ ¡TALADRO SUBTERRÁNEO! (-1)', 'show-hit');
+          feedback.animatePawnHit(enemyMatrix, opp.row, opp.col, oppDead, opp, enemyKey, oppDmg, oppAbsorbed);
+          soundManager.playHitSound();
+
+          if (oppCell && oppCell.btn) {
+            oppCell.btn.classList.add('cell-damage-flash');
+            const pEl = oppCell.btn.querySelector('.board-pawn-unit');
+            if (pEl) {
+              pEl.classList.remove('pawn-hit-flash');
+              void pEl.offsetWidth;
+              pEl.classList.add('pawn-hit-flash');
+            }
+            setTimeout(() => oppCell.btn.classList.remove('cell-damage-flash'), 500);
+          }
+
+          if (oppDead) {
+            const k = getKillTension(opp);
+            gameState.addPrestige(ownerKey, k);
+            feedback.updatePrestigeUI(ownerKey, gameState[ownerKey].prestige);
+            feedback.spawnSquareTensionParticles(opp, ownerKey, k);
+            this.procesarMuerteDePeon(enemyKey, opp, ownerKey);
+            gameState[enemyKey].pawns = gameState[enemyKey].pawns.filter(p => p.hp > 0);
+          }
+
+          setTimeout(() => {
+            feedback.renderPawns(this.p1GridMatrix, gameState.p1.pawns, this.p2GridMatrix, gameState.p2.pawns, this.currentGameMode);
+          }, 650);
+        } else {
+          // Si no hay enemigo en la casilla homóloga, dar feedback visual claro del impacto en la casilla vacía
+          feedback.showReactionBadge(ownerKey, '️ IMPACTO EN CASILLA (AGUA)', 'show-dodge');
+          soundManager.playMissSound ? soundManager.playMissSound() : soundManager.playHitSound();
+
+          if (oppCell && oppCell.btn) {
+            oppCell.btn.classList.add('cell-damage-flash');
+            setTimeout(() => oppCell.btn.classList.remove('cell-damage-flash'), 500);
+          }
+          feedback.spawnHitParticles({ row: deadPawn.row, col: deadPawn.col, playerKey: enemyKey });
+        }
+      });
     }
   }
 
@@ -1057,21 +1367,25 @@ export class GameController {
     const enemyKey = attackerKey === 'p1' ? 'p2' : 'p1';
     const enemyPawns = gameState[enemyKey].pawns;
 
-    feedback.showAbilityActivation(attackerKey, '💥 ¡HORNO DETONA! 1 DAÑO AoE');
+    feedback.showAbilityActivation(attackerKey, '¡HORNO DETONA! 1 DAÑO AoE');
     soundManager.playHitSound();
 
     let deadTension = 0;
     enemyPawns.forEach(pawn => {
       if (pawn && pawn.hp > 0) {
-        if (pawn.shield > 0) {
-          pawn.shield -= 1;
-        } else {
-          pawn.hp -= 1;
+        const { absorbed, actualDamage: damage, isDead } = applyDamageToPawn(pawn, 1);
+        const enemyMatrix = enemyKey === 'p1' ? this.p1GridMatrix : this.p2GridMatrix;
+        feedback.animatePawnHit(enemyMatrix, pawn.row, pawn.col, isDead, pawn, enemyKey, damage, absorbed);
+        const cellInfo = enemyMatrix[pawn.row] && enemyMatrix[pawn.row][pawn.col];
+        if (cellInfo && cellInfo.btn) {
+          cellInfo.btn.classList.add('cell-damage-flash');
+          setTimeout(() => cellInfo.btn.classList.remove('cell-damage-flash'), 450);
         }
-        if (pawn.hp <= 0) {
-          const killTension = pawn.isTitan ? KILL_TENSION.TITAN : (pawn.unitType === 'mediana' ? KILL_TENSION.MEDIANA : KILL_TENSION.PEQUENA);
+        if (isDead) {
+          const killTension = getKillTension(pawn);
           deadTension += killTension;
           feedback.spawnSquareTensionParticles(pawn, attackerKey, killTension);
+          this.procesarMuerteDePeon(enemyKey, pawn, attackerKey);
         }
       }
     });
@@ -1079,10 +1393,13 @@ export class GameController {
     if (deadTension > 0) {
       gameState.addPrestige(attackerKey, deadTension);
       feedback.updatePrestigeUI(attackerKey, gameState[attackerKey].prestige);
-      feedback.showReactionBadge(attackerKey, `🔥 HORNO KILLS: +${deadTension} TENSIÓN`, 'show-hit');
+      feedback.showReactionBadge(attackerKey, `HORNO KILLS: +${deadTension} TENSIÓN`, 'show-hit');
     }
 
+    feedback.updateAbilityChargesUI(attackerKey);
+
     gameState[enemyKey].pawns = gameState[enemyKey].pawns.filter(p => p.hp > 0);
+    feedback.renderPawns(this.p1GridMatrix, gameState.p1.pawns, this.p2GridMatrix, gameState.p2.pawns, this.currentGameMode);
   }
 
   preconfigurarAtaquesAutomaticos() {
@@ -1111,6 +1428,7 @@ export class GameController {
           target.hp += pending.hp;
           target.maxHp += pending.hp;
           target.atk = (target.atk || 0) + (pending.atk || 0);
+          feedback.animateStatBuff(pKey, target.row, target.col, 'all', pending.hp);
         }
       } else if (pending.row === null) {
         const pos = chooseBotPawnPosition([], btnMap, pState.pawns);
@@ -1120,6 +1438,7 @@ export class GameController {
             target.hp += pending.hp;
             target.maxHp += pending.hp;
             target.atk = (target.atk || 0) + (pending.atk || 0);
+            feedback.animateStatBuff(pKey, target.row, target.col, 'all', pending.hp);
           }
         } else {
           pending.row = pos.row;
@@ -1133,6 +1452,7 @@ export class GameController {
             target.hp += pending.hp;
             target.maxHp += pending.hp;
             target.atk = (target.atk || 0) + (pending.atk || 0);
+            feedback.animateStatBuff(pKey, target.row, target.col, 'all', pending.hp);
           }
         } else {
           pState.pawns.push({ ...pending });
@@ -1167,11 +1487,44 @@ export class GameController {
   // ================= RESOLUCIÓN DEL COMBATE =================
   ejecutarResolucionCombate() {
     // -------------------------------------------------------------
-    // PASO 1: HABILIDADES ACTIVAS QUE SE EJECUTAN ANTES DEL ATAQUE
+    // PASO 0: PASIVA DE HOLO (PRIMERA ACCIÓN AL ENTRAR EN RESOLUCIÓN)
     // -------------------------------------------------------------
+    let holoPassiveTriggered = false;
 
-    // RoboHand Activa: Mueve 1 unidad enemiga y le hace 1 daño (o 2 si no se puede mover)
     ['p1', 'p2'].forEach(playerKey => {
+      const pState = gameState[playerKey];
+      if (!pState || pState.character?.id !== 'holo') return;
+
+      const living = pState.pawns.filter(p => p && p.hp > 0);
+      if (living.length === 0) return;
+
+      const chosen = living[Math.floor(Math.random() * living.length)];
+      if (chosen.unitType === 'pequena') {
+        chosen.atk = (chosen.atk || 0) + 1;
+        feedback.animateStatBuff(playerKey, chosen.row, chosen.col, 'atk', chosen.atk);
+        feedback.showReactionBadge(playerKey, 'ESPEJO FRÁGIL: +1 ATAQUE', 'show-hit');
+        soundManager.playPawnPlaceSound();
+      } else {
+        chosen.shield = (chosen.shield || 0) + 1;
+        chosen.shieldExpiresAtRound = gameState.roundNumber;
+        feedback.animateShieldGrant(playerKey, chosen.row, chosen.col, chosen.shield);
+        feedback.showReactionBadge(playerKey, 'ESCUDO HOLOGRÁFICO (+1)', 'show-dodge');
+        soundManager.playShieldSound();
+      }
+      holoPassiveTriggered = true;
+    });
+
+    if (holoPassiveTriggered) {
+      feedback.renderPawns(this.p1GridMatrix, gameState.p1.pawns, this.p2GridMatrix, gameState.p2.pawns, this.currentGameMode);
+    }
+
+    const resolverFaseCombate = () => {
+      // -------------------------------------------------------------
+      // PASO 1: HABILIDADES ACTIVAS QUE SE EJECUTAN ANTES DEL ATAQUE
+      // -------------------------------------------------------------
+
+      // RoboHand Activa: Mueve 1 unidad enemiga y le hace 1 daño (o 2 si no se puede mover)
+      ['p1', 'p2'].forEach(playerKey => {
       const pState = gameState[playerKey];
       if (pState.selectedAction === 'ability' && (pState.character?.id === 'el_brazo' || pState.character?.id === 'robohand')) {
         pState.activeAbilityCharges = Math.max(0, pState.activeAbilityCharges - 1);
@@ -1197,10 +1550,10 @@ export class GameController {
             targetPawn.row = spot.r;
             targetPawn.col = spot.c;
             targetPawn.hp -= 1;
-            feedback.showReactionBadge(playerKey, '🤖 REUBICACIÓN Y 1 DAÑO', 'show-hit');
+            feedback.showReactionBadge(playerKey, 'REUBICACIÓN Y 1 DAÑO', 'show-hit');
           } else {
             targetPawn.hp -= 2;
-            feedback.showReactionBadge(playerKey, '🤖 SIN ESPACIO: ¡2 DE DAÑO!', 'show-hit');
+            feedback.showReactionBadge(playerKey, 'SIN ESPACIO: ¡2 DE DAÑO!', 'show-hit');
           }
 
           // RoboHand Medio: "Cada ronda que se mueve una unidad enemiga, gana 1 de ataque"
@@ -1209,12 +1562,14 @@ export class GameController {
           });
 
           if (targetPawn.hp <= 0) {
-            const killPrestige = targetPawn.isTitan ? KILL_TENSION.TITAN : (targetPawn.unitType === 'mediana' ? KILL_TENSION.MEDIANA : KILL_TENSION.PEQUENA);
+            const killPrestige = getKillTension(targetPawn);
             gameState.addPrestige(playerKey, killPrestige);
             feedback.spawnSquareTensionParticles(targetPawn, playerKey, killPrestige);
+            this.procesarMuerteDePeon(enemyKey, targetPawn, playerKey);
+            gameState[enemyKey].pawns = gameState[enemyKey].pawns.filter(p => p.hp > 0);
           }
         } else {
-          feedback.showReactionBadge(playerKey, '🤖 AGARRE AL VACÍO', 'show-dodge');
+          feedback.showReactionBadge(playerKey, 'AGARRE AL VACÍO', 'show-dodge');
         }
       }
     });
@@ -1226,25 +1581,20 @@ export class GameController {
         pState.activeAbilityCharges = Math.max(0, pState.activeAbilityCharges - 1);
         feedback.updateAbilityChargesUI(playerKey);
 
-        feedback.showReactionBadge(playerKey, '⛏️ FALLA TECTÓNICA: 1 DAÑO A AMBOS TABLEROS', 'show-hit');
+        feedback.showReactionBadge(playerKey, '️ TERRAFORMAR: 1 DAÑO A AMBOS TABLEROS', 'show-hit');
 
         ['p1', 'p2'].forEach(sideKey => {
           const sidePawns = gameState[sideKey].pawns;
           sidePawns.forEach(p => {
             if (p && p.hp > 0) {
-              if (p.shield > 0) {
-                p.shield -= 1;
-              } else {
-                p.hp -= 1;
-                // Taladro Pasiva: "Cuando un aliado recibe daño, gana 1 de ataque extra"
-                if (gameState[sideKey].character?.id === 'taladro' && p.hp > 0) {
-                  p.atk = (p.atk || 0) + 1;
-                }
+              const { absorbed, actualDamage, isDead } = applyDamageToPawn(p, 1);
+              if (actualDamage > 0 && gameState[sideKey].character?.id === 'taladro' && !isDead) {
+                p.atk = (p.atk || 0) + 1;
               }
 
-              if (p.hp <= 0) {
+              if (isDead) {
                 if (sideKey !== playerKey) {
-                  const killT = p.isTitan ? KILL_TENSION.TITAN : (p.unitType === 'mediana' ? KILL_TENSION.MEDIANA : KILL_TENSION.PEQUENA);
+                  const killT = getKillTension(p);
                   gameState.addPrestige(playerKey, killT);
                   feedback.spawnSquareTensionParticles(p, playerKey, killT);
                 }
@@ -1256,15 +1606,8 @@ export class GameController {
                     chosen.atk = (chosen.atk || 0) + 1;
                   }
                 }
-                // Taladro Pequeño al morir: realiza 1 de daño en casilla homóloga
-                if (p.unitType === 'pequena' && gameState[sideKey].character?.id === 'taladro') {
-                  const oppKey = sideKey === 'p1' ? 'p2' : 'p1';
-                  const oppPawn = gameState[oppKey].pawns.find(op => op && op.row === p.row && op.col === p.col && op.hp > 0);
-                  if (oppPawn) {
-                    if (oppPawn.shield > 0) oppPawn.shield -= 1;
-                    else oppPawn.hp -= 1;
-                  }
-                }
+                // Taladro Pequeño al morir: se procesa mediante procesarMuerteDePeon
+                this.procesarMuerteDePeon(sideKey, p, playerKey);
               }
             }
           });
@@ -1272,65 +1615,74 @@ export class GameController {
       }
     });
 
-    // Incinerador Activa: Consume TODA tu chatarra (cada una suma al horno)
+    // Incinerador Activa: Suma +1 al horno y consume TODA tu chatarra (cada una suma +1 al horno)
     ['p1', 'p2'].forEach(playerKey => {
       const pState = gameState[playerKey];
       if (pState.selectedAction === 'ability' && pState.character?.id === 'incinerador') {
         pState.activeAbilityCharges = Math.max(0, pState.activeAbilityCharges - 1);
         feedback.updateAbilityChargesUI(playerKey);
 
-        const chatarras = pState.pawns.filter(p => !p.isTitan && p.unitType === 'pequena');
+        const matrix = playerKey === 'p1' ? this.p1GridMatrix : this.p2GridMatrix;
+        const chatarras = pState.pawns.filter(p => !p.isTitan && p.unitType === 'pequena' && p.hp > 0);
+
+        // Suma +1 de base por ignición del horno
+        pState.hornoCount = (pState.hornoCount || 0) + 1;
+
+        // Cada chatarra arde y se añade al horno
+        chatarras.forEach(c => {
+          const cell = matrix[c.row] && matrix[c.row][c.col];
+          if (cell && cell.btn) {
+            feedback.spawnFloatingBuff(cell.btn, 'AL HORNO (+1)', 'all');
+            feedback.spawnHitParticles(cell.btn);
+          }
+        });
+
+        pState.hornoCount += chatarras.length;
         pState.pawns = pState.pawns.filter(p => p.isTitan || p.unitType !== 'pequena');
-        pState.hornoCount = (pState.hornoCount || 0) + chatarras.length;
-        feedback.showReactionBadge(playerKey, `🔥 CONSUMIDAS ${chatarras.length} CHATARRAS`, 'show-dodge');
+
+        soundManager.playHitSound();
+        feedback.showReactionBadge(playerKey, `IGNICIÓN (+${1 + chatarras.length} AL HORNO: ${pState.hornoCount}/3)`, 'show-dodge');
+        feedback.renderPawns(this.p1GridMatrix, gameState.p1.pawns, this.p2GridMatrix, gameState.p2.pawns, this.currentGameMode);
 
         while (pState.hornoCount >= 3) {
           pState.hornoCount -= 3;
           this.detonarHorno(playerKey);
         }
+        feedback.updateAbilityChargesUI(playerKey);
       }
     });
 
-    // Swarm Activa: Sacrifica todas tus unidades pequeñas
+    // Swarm Activa: Sacrifica todas tus unidades pequeñas y medianas (Drones)
     ['p1', 'p2'].forEach(playerKey => {
       const pState = gameState[playerKey];
       if (pState.selectedAction === 'ability' && pState.character?.id === 'dron_enjambre') {
         pState.activeAbilityCharges = Math.max(0, pState.activeAbilityCharges - 1);
         feedback.updateAbilityChargesUI(playerKey);
 
-        const drones = pState.pawns.filter(p => !p.isTitan && p.unitType === 'pequena');
-        pState.pawns = pState.pawns.filter(p => p.isTitan || p.unitType !== 'pequena');
+        const matrix = playerKey === 'p1' ? this.p1GridMatrix : this.p2GridMatrix;
+        const drones = pState.pawns.filter(p => p && !p.isTitan && p.hp > 0);
+        pState.pawns = pState.pawns.filter(p => p && p.isTitan);
 
-        const enemyKey = playerKey === 'p1' ? 'p2' : 'p1';
-        let killedTension = 0;
-
-        drones.forEach(() => {
-          const enemyLiving = gameState[enemyKey].pawns.filter(p => p && p.hp > 0);
-          if (enemyLiving.length > 0) {
-            const target = enemyLiving[Math.floor(Math.random() * enemyLiving.length)];
-            if (target.shield > 0) {
-              target.shield -= 1;
-            } else {
-              target.hp -= 1;
+        if (drones.length > 0) {
+          feedback.showReactionBadge(playerKey, `SACRIFICIO DE ${drones.length} DRONES`, 'show-hit');
+          drones.forEach((drone, idx) => {
+            const cell = matrix[drone.row] && matrix[drone.row][drone.col];
+            if (cell && cell.btn) {
+              feedback.spawnDeathParticles(cell.btn);
+              const pUnit = cell.btn.querySelector('.board-pawn-unit');
+              if (pUnit) pUnit.remove();
             }
-            if (target.hp <= 0) {
-              const k = target.isTitan ? KILL_TENSION.TITAN : (target.unitType === 'mediana' ? KILL_TENSION.MEDIANA : KILL_TENSION.PEQUENA);
-              killedTension += k;
-              feedback.spawnSquareTensionParticles(target, playerKey, k);
-            }
-          }
-        });
-
-        if (killedTension > 0) {
-          gameState.addPrestige(playerKey, killedTension);
-          feedback.showReactionBadge(playerKey, `🐝 DRONES DETONADOS: +${killedTension} TENSIÓN`, 'show-hit');
+            setTimeout(() => {
+              this.ejecutarMuerteDronSwarm(playerKey, drone);
+            }, idx * 260);
+          });
         } else {
-          feedback.showReactionBadge(playerKey, `🐝 SACRIFICADOS ${drones.length} DRONES`, 'show-dodge');
+          feedback.showReactionBadge(playerKey, 'SIN DRONES PARA SACRIFICAR', 'show-dodge');
         }
       }
     });
 
-    // Holo Activa: Convierte los escudos en +1/+1 de daño y vida
+    // Holo Activa (Prestigio): Convierte los escudos en +1/+1 de daño y vida
     ['p1', 'p2'].forEach(playerKey => {
       const pState = gameState[playerKey];
       if (pState.selectedAction === 'ability' && pState.character?.id === 'holo') {
@@ -1340,70 +1692,22 @@ export class GameController {
         let count = 0;
         pState.pawns.forEach(pawn => {
           if (pawn && pawn.hp > 0 && pawn.shield > 0) {
+            const shieldsToConvert = pawn.shield;
             pawn.shield = 0;
-            pawn.atk = (pawn.atk || 0) + 1;
-            pawn.hp += 1;
-            pawn.maxHp += 1;
-            count++;
+            pawn.atk = (pawn.atk || 0) + shieldsToConvert;
+            pawn.hp += shieldsToConvert;
+            pawn.maxHp += shieldsToConvert;
+            count += shieldsToConvert;
+            feedback.animateStatBuff(playerKey, pawn.row, pawn.col, 'all', shieldsToConvert);
           }
         });
-        feedback.showReactionBadge(playerKey, `🌀 ${count} ESCUDOS CONVERTIDOS EN +1/+1`, 'show-dodge');
-      }
-    });
 
-    // Holo Pasiva: Otorga escudo a una unidad aleatoria (o +1 atk si es Holo Pequeño)
-    ['p1', 'p2'].forEach(playerKey => {
-      const pState = gameState[playerKey];
-      if (pState.character?.id === 'holo') {
-        const living = pState.pawns.filter(p => p && p.hp > 0);
-        if (living.length > 0) {
-          const chosen = living[Math.floor(Math.random() * living.length)];
-          if (chosen.unitType === 'pequena') {
-            chosen.atk = (chosen.atk || 0) + 1;
-            feedback.showReactionBadge(playerKey, '🌀 PEQUEÑO RECIBE +1 ATAQUE (EN VEZ DE ESCUDO)', 'show-dodge');
-          } else {
-            chosen.shield = (chosen.shield || 0) + 1;
-            feedback.showReactionBadge(playerKey, '🌀 ESCUDO HOLOGRÁFICO', 'show-dodge');
-          }
+        if (count > 0) {
+          feedback.showReactionBadge(playerKey, `PRESTIGIO: ${count} ESCUDOS EN +1/+1`, 'show-dodge');
+          feedback.renderPawns(this.p1GridMatrix, gameState.p1.pawns, this.p2GridMatrix, gameState.p2.pawns, this.currentGameMode);
+        } else {
+          feedback.showReactionBadge(playerKey, 'PRESTIGIO: SIN ESCUDOS', 'show-dodge');
         }
-      }
-    });
-
-    // Swarm Medio: "Cada ronda, añade 1 de daño a un dron adyacente"
-    ['p1', 'p2'].forEach(playerKey => {
-      const pState = gameState[playerKey];
-      if (pState.character?.id === 'dron_enjambre') {
-        const mediums = pState.pawns.filter(p => p && p.unitType === 'mediana' && p.hp > 0);
-        mediums.forEach(med => {
-          const adjDrones = pState.pawns.filter(p =>
-            p && p.hp > 0 && p.id !== med.id &&
-            Math.abs(p.row - med.row) <= 1 && Math.abs(p.col - med.col) <= 1
-          );
-          if (adjDrones.length > 0) {
-            const tgt = adjDrones[Math.floor(Math.random() * adjDrones.length)];
-            tgt.atk = (tgt.atk || 0) + 1;
-            feedback.showReactionBadge(playerKey, '🐝 NODRIZA: +1 ATAQUE A DRON ADYACENTE', 'show-dodge');
-          }
-        });
-      }
-    });
-
-    // Cyborg Medio: "Cada ronda, otorga escudo a una unidad adyacente"
-    ['p1', 'p2'].forEach(playerKey => {
-      const pState = gameState[playerKey];
-      if (pState.character?.id === 'cyborg') {
-        const mediums = pState.pawns.filter(p => p && p.unitType === 'mediana' && p.hp > 0);
-        mediums.forEach(med => {
-          const adjAllies = pState.pawns.filter(p =>
-            p && p.hp > 0 && p.id !== med.id &&
-            Math.abs(p.row - med.row) <= 1 && Math.abs(p.col - med.col) <= 1
-          );
-          if (adjAllies.length > 0) {
-            const tgt = adjAllies[Math.floor(Math.random() * adjAllies.length)];
-            tgt.shield = (tgt.shield || 0) + 1;
-            feedback.showReactionBadge(playerKey, '🛡️ CENTINELA: ESCUDO ADYACENTE', 'show-dodge');
-          }
-        });
       }
     });
 
@@ -1413,8 +1717,10 @@ export class GameController {
     const target1 = gameState.p1.attackTarget || { row: 0, col: 0 };
     const target2 = gameState.p2.attackTarget || { row: 0, col: 0 };
 
-    const p1Attacking = gameState.p1.selectedAction === 'attack';
-    const p2Attacking = gameState.p2.selectedAction === 'attack';
+    const p1Attacking = gameState.p1.selectedAction === 'attack' ||
+      (gameState.p1.selectedAction === 'ability' && gameState.p1.character?.id === 'cyborg');
+    const p2Attacking = gameState.p2.selectedAction === 'attack' ||
+      (gameState.p2.selectedAction === 'ability' && gameState.p2.character?.id === 'cyborg');
 
     let hitPawn2 = p1Attacking ? gameState.p2.pawns.find(p => p && p.row === target1.row && p.col === target1.col && p.hp > 0) : null;
     let hitPawn1 = p2Attacking ? gameState.p1.pawns.find(p => p && p.row === target2.row && p.col === target2.col && p.hp > 0) : null;
@@ -1446,26 +1752,21 @@ export class GameController {
         }
 
         if (hitPawn2) {
-          if (hitPawn2.shield > 0) {
-            hitPawn2.shield -= 1;
-            p1Damage -= 1;
-            feedback.showReactionBadge('p2', '🛡️ ESCUDO ABSORBE DAÑO', 'show-dodge');
-          }
-          if (p1Damage > 0) {
-            hitPawn2.hp -= p1Damage;
+          // Holo Medio: la ronda siguiente a la que el jugador dispara a una unidad, recibe un escudo
+          if (gameState.p1.character?.id === 'holo') {
+            gameState.p1.holoMediumShieldNextRound = true;
           }
 
-          // Holo Medio: Cada vez que el enemigo recibe daño, esta unidad recibe un escudo
-          if (gameState.p1.character?.id === 'holo') {
-            gameState.p1.pawns.filter(p => p && p.unitType === 'mediana' && p.hp > 0).forEach(m => {
-              m.shield = (m.shield || 0) + 1;
-            });
+          const { absorbed: p1Absorbed, actualDamage: p1ActualDamage, isDead: isDestroyed } = applyDamageToPawn(hitPawn2, p1Damage);
+          if (p1Absorbed > 0) {
+            feedback.showReactionBadge('p2', `️ ESCUDO ABSORBE ${p1Absorbed} DAÑO`, 'show-dodge');
           }
 
           // Taladro Pasiva: Cuando un aliado recibe daño, gana 1 de ataque extra
-          if (gameState.p2.character?.id === 'taladro' && hitPawn2.hp > 0) {
+          if (gameState.p2.character?.id === 'taladro' && p1ActualDamage > 0 && hitPawn2.hp > 0) {
             hitPawn2.atk = (hitPawn2.atk || 0) + 1;
-            feedback.showReactionBadge('p2', '⛏️ RESILIENCIA: +1 ATAQUE TRAS DAÑO', 'show-dodge');
+            feedback.showReactionBadge('p2', '️ RESILIENCIA: +1 ATAQUE TRAS DAÑO', 'show-dodge');
+            feedback.animateStatBuff('p2', hitPawn2.row, hitPawn2.col, 'atk', 1);
           }
 
           // RoboHand Pasiva: Los ataques mueven a las unidades hacia una casilla superior, si no hay superior, la manda abajo del todo
@@ -1479,69 +1780,28 @@ export class GameController {
             } else {
               hitPawn2.row = nextRow;
             }
-            feedback.showReactionBadge('p1', '🤖 IMPULSO VERTICAL (EMPUJE)', 'show-dodge');
+            feedback.showReactionBadge('p1', 'IMPULSO VERTICAL (EMPUJE)', 'show-dodge');
             gameState.p1.pawns.filter(p => p && p.unitType === 'mediana' && p.hp > 0).forEach(m => {
               m.atk = (m.atk || 0) + 1;
             });
           }
 
-          const isDestroyed = hitPawn2.hp <= 0;
-          feedback.animatePawnHit(this.p2GridMatrix, hitPawn2.row, hitPawn2.col, isDestroyed, hitPawn2, 'p2');
+          feedback.animatePawnHit(this.p2GridMatrix, hitPawn2.row, hitPawn2.col, isDestroyed, hitPawn2, 'p2', p1ActualDamage, p1Absorbed);
 
           if (isDestroyed) {
-            const killTension = hitPawn2.isTitan ? KILL_TENSION.TITAN : (hitPawn2.unitType === 'mediana' ? KILL_TENSION.MEDIANA : KILL_TENSION.PEQUENA);
+            const killTension = getKillTension(hitPawn2);
             p1TensionDelta += killTension;
-            feedback.showReactionBadge('p1', `💥 ¡ELIMINADO! (+${killTension})`, 'show-hit');
+            feedback.showReactionBadge('p1', `¡ELIMINADO! (+${killTension})`, 'show-hit');
             hitPawn2.playerKey = 'p2';
             feedback.spawnSquareTensionParticles(hitPawn2, 'p1', killTension);
-
-            // Swarm pasiva al morir dron
-            if (gameState.p2.character?.id === 'dron_enjambre' && !hitPawn2.isTitan) {
-              const p1Living = gameState.p1.pawns.filter(p => p && p.hp > 0);
-              if (p1Living.length > 0) {
-                const randP1 = p1Living[Math.floor(Math.random() * p1Living.length)];
-                randP1.hp -= 1;
-                feedback.showReactionBadge('p2', '🐝 DRON EXPLOSIÓN (-1 HP)', 'show-hit');
-              }
-            }
-
-            // Incinerador Medio al morir: mejora 1hp a una chatarra
-            if (gameState.p2.character?.id === 'incinerador' && hitPawn2.unitType === 'mediana') {
-              const chatarras = gameState.p2.pawns.filter(p => p && p.unitType === 'pequena' && p.hp > 0);
-              if (chatarras.length > 0) {
-                const c = chatarras[0];
-                c.hp += 1;
-                c.maxHp += 1;
-                feedback.showReactionBadge('p2', '🔥 MEJORA +1 HP A CHATARRA', 'show-dodge');
-              }
-            }
-
-            // Taladro Medio al morir: otorga 1 de daño a una unidad aliada aleatoria
-            if (gameState.p2.character?.id === 'taladro' && hitPawn2.unitType === 'mediana') {
-              const allies = gameState.p2.pawns.filter(p => p && p.hp > 0 && p.id !== hitPawn2.id);
-              if (allies.length > 0) {
-                const a = allies[Math.floor(Math.random() * allies.length)];
-                a.atk = (a.atk || 0) + 1;
-                feedback.showReactionBadge('p2', '⛏️ +1 ATAQUE A ALIADO', 'show-dodge');
-              }
-            }
-
-            // Taladro Pequeño al morir: realiza 1 de daño en su casilla homóloga
-            if (gameState.p2.character?.id === 'taladro' && hitPawn2.unitType === 'pequena') {
-              const opp = gameState.p1.pawns.find(p => p && p.row === hitPawn2.row && p.col === hitPawn2.col && p.hp > 0);
-              if (opp) {
-                if (opp.shield > 0) opp.shield -= 1;
-                else opp.hp -= 1;
-                feedback.showReactionBadge('p2', '⛏️ DAÑO EN CASILLA HOMÓLOGA', 'show-hit');
-              }
-            }
+            this.procesarMuerteDePeon('p2', hitPawn2, 'p1');
           } else {
-            feedback.showReactionBadge('p1', `⚡ ¡IMPACTO! (-${p1Damage} HP)`, 'show-hit');
+            feedback.showReactionBadge('p1', `¡IMPACTO! (-${p1ActualDamage} HP)`, 'show-hit');
           }
           feedback.triggerHurtAnimation('p2');
           soundManager.playHitSound();
         } else {
-          feedback.showReactionBadge('p1', '💧 ¡FALLO! (AGUA)', 'show-dodge');
+          feedback.showReactionBadge('p1', '¡FALLO! (AGUA)', 'show-dodge');
         }
       }
 
@@ -1556,24 +1816,20 @@ export class GameController {
         }
 
         if (hitPawn1) {
-          if (hitPawn1.shield > 0) {
-            hitPawn1.shield -= 1;
-            p2Damage -= 1;
-            feedback.showReactionBadge('p1', '🛡️ ESCUDO ABSORBE DAÑO', 'show-dodge');
-          }
-          if (p2Damage > 0) {
-            hitPawn1.hp -= p2Damage;
-          }
-
+          // Holo Medio: la ronda siguiente a la que el jugador dispara a una unidad, recibe un escudo
           if (gameState.p2.character?.id === 'holo') {
-            gameState.p2.pawns.filter(p => p && p.unitType === 'mediana' && p.hp > 0).forEach(m => {
-              m.shield = (m.shield || 0) + 1;
-            });
+            gameState.p2.holoMediumShieldNextRound = true;
           }
 
-          if (gameState.p1.character?.id === 'taladro' && hitPawn1.hp > 0) {
+          const { absorbed: p2Absorbed, actualDamage: p2ActualDamage, isDead: isDestroyed } = applyDamageToPawn(hitPawn1, p2Damage);
+          if (p2Absorbed > 0) {
+            feedback.showReactionBadge('p1', `️ ESCUDO ABSORBE ${p2Absorbed} DAÑO`, 'show-dodge');
+          }
+
+          if (gameState.p1.character?.id === 'taladro' && p2ActualDamage > 0 && hitPawn1.hp > 0) {
             hitPawn1.atk = (hitPawn1.atk || 0) + 1;
-            feedback.showReactionBadge('p1', '⛏️ RESILIENCIA: +1 ATAQUE TRAS DAÑO', 'show-dodge');
+            feedback.showReactionBadge('p1', '️ RESILIENCIA: +1 ATAQUE TRAS DAÑO', 'show-dodge');
+            feedback.animateStatBuff('p1', hitPawn1.row, hitPawn1.col, 'atk', 1);
           }
 
           if (gameState.p2.character?.id === 'el_brazo' && hitPawn1.hp > 0) {
@@ -1586,65 +1842,28 @@ export class GameController {
             } else {
               hitPawn1.row = nextRow;
             }
-            feedback.showReactionBadge('p2', '🤖 IMPULSO VERTICAL (EMPUJE)', 'show-dodge');
+            feedback.showReactionBadge('p2', 'IMPULSO VERTICAL (EMPUJE)', 'show-dodge');
             gameState.p2.pawns.filter(p => p && p.unitType === 'mediana' && p.hp > 0).forEach(m => {
               m.atk = (m.atk || 0) + 1;
             });
           }
 
-          const isDestroyed = hitPawn1.hp <= 0;
-          feedback.animatePawnHit(this.p1GridMatrix, hitPawn1.row, hitPawn1.col, isDestroyed, hitPawn1, 'p1');
+          feedback.animatePawnHit(this.p1GridMatrix, hitPawn1.row, hitPawn1.col, isDestroyed, hitPawn1, 'p1', p2ActualDamage, p2Absorbed);
 
           if (isDestroyed) {
-            const killTension = hitPawn1.isTitan ? KILL_TENSION.TITAN : (hitPawn1.unitType === 'mediana' ? KILL_TENSION.MEDIANA : KILL_TENSION.PEQUENA);
+            const killTension = getKillTension(hitPawn1);
             p2TensionDelta += killTension;
-            feedback.showReactionBadge('p2', `💥 ¡ELIMINADO! (+${killTension})`, 'show-hit');
+            feedback.showReactionBadge('p2', `¡ELIMINADO! (+${killTension})`, 'show-hit');
             hitPawn1.playerKey = 'p1';
             feedback.spawnSquareTensionParticles(hitPawn1, 'p2', killTension);
-
-            if (gameState.p1.character?.id === 'dron_enjambre' && !hitPawn1.isTitan) {
-              const p2Living = gameState.p2.pawns.filter(p => p && p.hp > 0);
-              if (p2Living.length > 0) {
-                const randP2 = p2Living[Math.floor(Math.random() * p2Living.length)];
-                randP2.hp -= 1;
-                feedback.showReactionBadge('p1', '🐝 DRON EXPLOSIÓN (-1 HP)', 'show-hit');
-              }
-            }
-
-            if (gameState.p1.character?.id === 'incinerador' && hitPawn1.unitType === 'mediana') {
-              const chatarras = gameState.p1.pawns.filter(p => p && p.unitType === 'pequena' && p.hp > 0);
-              if (chatarras.length > 0) {
-                const c = chatarras[0];
-                c.hp += 1;
-                c.maxHp += 1;
-                feedback.showReactionBadge('p1', '🔥 MEJORA +1 HP A CHATARRA', 'show-dodge');
-              }
-            }
-
-            if (gameState.p1.character?.id === 'taladro' && hitPawn1.unitType === 'mediana') {
-              const allies = gameState.p1.pawns.filter(p => p && p.hp > 0 && p.id !== hitPawn1.id);
-              if (allies.length > 0) {
-                const a = allies[Math.floor(Math.random() * allies.length)];
-                a.atk = (a.atk || 0) + 1;
-                feedback.showReactionBadge('p1', '⛏️ +1 ATAQUE A ALIADO', 'show-dodge');
-              }
-            }
-
-            if (gameState.p1.character?.id === 'taladro' && hitPawn1.unitType === 'pequena') {
-              const opp = gameState.p2.pawns.find(p => p && p.row === hitPawn1.row && p.col === hitPawn1.col && p.hp > 0);
-              if (opp) {
-                if (opp.shield > 0) opp.shield -= 1;
-                else opp.hp -= 1;
-                feedback.showReactionBadge('p1', '⛏️ DAÑO EN CASILLA HOMÓLOGA', 'show-hit');
-              }
-            }
+            this.procesarMuerteDePeon('p1', hitPawn1, 'p2');
           } else {
-            feedback.showReactionBadge('p2', `⚡ ¡IMPACTO! (-${p2Damage} HP)`, 'show-hit');
+            feedback.showReactionBadge('p2', `¡IMPACTO! (-${p2ActualDamage} HP)`, 'show-hit');
           }
           feedback.triggerHurtAnimation('p1');
           soundManager.playHitSound();
         } else {
-          feedback.showReactionBadge('p2', '💧 ¡FALLO! (AGUA)', 'show-dodge');
+          feedback.showReactionBadge('p2', '¡FALLO! (AGUA)', 'show-dodge');
         }
       }
 
@@ -1675,7 +1894,7 @@ export class GameController {
           if (gain > 0) {
             if (playerKey === 'p1') p1TensionDelta += gain;
             else p2TensionDelta += gain;
-            feedback.showReactionBadge(playerKey, `⚡ BATERÍA HUMANA: +${gain} TENSIÓN`, 'show-dodge');
+            feedback.showReactionBadge(playerKey, `BATERÍA HUMANA: +${gain} TENSIÓN`, 'show-dodge');
             const baseDelay = unitTensionDelays[playerKey] * 420;
             livingAllies.slice(0, gain).forEach((ally, idx) => {
               feedback.spawnSquareTensionParticles(ally, playerKey, 1, null, baseDelay + idx * 280);
@@ -1703,20 +1922,13 @@ export class GameController {
                 row: freeSpot.row,
                 col: freeSpot.col
               });
-              feedback.showReactionBadge(playerKey, '⚙️ CHATARRERÍA (+1 CHATARRA)', 'show-dodge');
+              feedback.showReactionBadge(playerKey, '️ CHATARRERÍA (+1 CHATARRA)', 'show-dodge');
             }
           }
         }
       });
 
-      // Holo Titán: su daño se iguala a su vida
-      ['p1', 'p2'].forEach(playerKey => {
-        const pState = gameState[playerKey];
-        if (pState.character?.id === 'holo') {
-          const titan = pState.pawns.find(p => p && p.isTitan && p.hp > 0);
-          if (titan) titan.atk = titan.hp;
-        }
-      });
+
 
       // Aplicar tensión acumulada
       gameState.addPrestige('p1', p1TensionDelta);
@@ -1728,9 +1940,14 @@ export class GameController {
       gameState.p1.pawns = gameState.p1.pawns.filter(p => p && p.hp > 0);
       gameState.p2.pawns = gameState.p2.pawns.filter(p => p && p.hp > 0);
 
-      // Limpiar escudos caducados
-      gameState.p1.pawns.forEach(p => p.shield = 0);
-      gameState.p2.pawns.forEach(p => p.shield = 0);
+      // Caducar escudos de la ronda que no hayan sido consumidos
+      ['p1', 'p2'].forEach(sideKey => {
+        gameState[sideKey].pawns.forEach(p => {
+          if (p && p.shield > 0 && p.shieldExpiresAtRound && p.shieldExpiresAtRound <= gameState.roundNumber) {
+            p.shield = 0;
+          }
+        });
+      });
 
       if (hitPawn1 || hitPawn2) {
         feedback.shakeScreen();
@@ -1749,7 +1966,16 @@ export class GameController {
         }
       }, 2000);
     }, 500);
+  };
+
+  if (holoPassiveTriggered) {
+    setTimeout(() => {
+      resolverFaseCombate();
+    }, 750);
+  } else {
+    resolverFaseCombate();
   }
+}
 
   finalizarPartida() {
     gameState.setPhase(PHASES.GAME_OVER);
@@ -1767,7 +1993,7 @@ export class GameController {
         const p1Char = gameState.p1?.character;
         const p2Char = gameState.p2?.character;
         this.iniciarPartidaDinamica(currentMode, p1Char, p2Char);
-      });
+      }, { once: true });
     }
 
     if (btnMenuGame) {
@@ -1775,7 +2001,7 @@ export class GameController {
         soundManager.playPawnPlaceSound();
         soundManager.playMenuMusic();
         screens.showScreen('start');
-      });
+      }, { once: true });
     }
   }
 
@@ -1822,7 +2048,7 @@ export class GameController {
 
     feedback.renderPawns(this.p1GridMatrix, gameState.p1.pawns, this.p2GridMatrix, gameState.p2.pawns, this.currentGameMode);
     soundManager.playPawnPlaceSound();
-    feedback.updateRoundDrawer('¡TITANES COLOCADOS!', 'placement');
+    feedback.updateRoundDrawer('TITÁN', 'titan');
 
     setTimeout(() => {
       this.iniciarCicloRonda();
@@ -1837,6 +2063,25 @@ export class GameController {
     soundManager.playRoundMusic(gameState.roundNumber);
     feedback.clearDiceOverlays();
     feedback.clearBoardEffects();
+
+    // Prisma Holográfico (Holo): la ronda siguiente a disparar a una unidad enemiga, recibe un escudo
+    ['p1', 'p2'].forEach(playerKey => {
+      const pState = gameState[playerKey];
+      if (pState.character?.id === 'holo' && pState.holoMediumShieldNextRound) {
+        const mediums = pState.pawns.filter(p => p && p.unitType === 'mediana' && p.hp > 0);
+        if (mediums.length > 0) {
+          mediums.forEach(m => {
+            m.shield = (m.shield || 0) + 1;
+            m.shieldExpiresAtRound = gameState.roundNumber;
+            feedback.animateShieldGrant(playerKey, m.row, m.col, m.shield);
+          });
+          feedback.showReactionBadge(playerKey, 'PRISMA HOLOGRÁFICO (+1 ESCUDO)', 'show-dodge');
+          soundManager.playShieldSound();
+        }
+        pState.holoMediumShieldNextRound = false;
+      }
+    });
+
     feedback.renderPawns(this.p1GridMatrix, gameState.p1.pawns, this.p2GridMatrix, gameState.p2.pawns, this.currentGameMode);
 
     this.cambiarFase(PHASES.WARNING_PLACEMENT);

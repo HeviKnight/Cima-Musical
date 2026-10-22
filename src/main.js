@@ -7,6 +7,12 @@ import { CONTROLS } from './data/controls.js';
 import { screens } from './ui/screens.js';
 import { soundManager } from './audio/sound-manager.js';
 import { gameController } from './core/game-controller.js';
+import { feedback } from './ui/feedback.js';
+
+if (import.meta.env.DEV) {
+  window.feedback = feedback;
+  window.gameController = gameController;
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   // Inicializar gestor de pantallas
@@ -60,13 +66,13 @@ document.addEventListener('DOMContentLoaded', () => {
     soundManager.startBackgroundMusic();
 
     // Control de Listo por jugador: Espacio para P1 y Enter para P2
-    if (e.code === 'Space' || e.key === ' ' || e.keyCode === 32) {
+    if (e.code === 'Space' || e.key === ' ') {
       e.preventDefault();
       gameController.handleReadyInput('p1');
       return;
     }
 
-    if (e.code === 'Enter' || e.key === 'Enter' || e.keyCode === 13) {
+    if (e.code === 'Enter' || e.key === 'Enter') {
       e.preventDefault();
       gameController.handleReadyInput('p2');
       return;

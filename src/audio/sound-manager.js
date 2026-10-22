@@ -223,6 +223,44 @@ class SoundManager {
     this.playSFX(GAME_OVER_SFXR_CODE, AUDIO_CONFIG.volumes.gameOver);
   }
 
+  playShieldSound() {
+    try {
+      const ctx = this.getAudioContext();
+      if (!ctx) return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(340, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(780, ctx.currentTime + 0.22);
+      const vol = (AUDIO_CONFIG.masterSFX || 0.5) * 0.75;
+      gain.gain.setValueAtTime(vol, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.32);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.32);
+    } catch (e) { }
+  }
+
+  playShootSound() {
+    try {
+      const ctx = this.getAudioContext();
+      if (!ctx) return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(640, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(160, ctx.currentTime + 0.16);
+      const vol = (AUDIO_CONFIG.masterSFX || 0.5) * 0.6;
+      gain.gain.setValueAtTime(vol, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.18);
+    } catch (e) { }
+  }
+
   playGridIntroSound() {
     this.playSFX(GAME_START_ANIMATION_CODE, AUDIO_CONFIG.volumes.gridIntro);
   }

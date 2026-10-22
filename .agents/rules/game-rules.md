@@ -80,19 +80,19 @@ Cada personaje dispone de 3 tipos de unidades con estadísticas específicas `(d
 ### 1. Incinerador
 > *"Acumula chatarra para quemarla, dañando las unidades rivales."*
 - **Keywords**: Chatarra = Unidad pequeña aliada.
-- **Pasiva**: Al final de tu turno, además tiene un contador de chatarra: cada chatarra consumida suma 1 al contador. Al llegar a 3 → 1 de daño a todas las unidades enemigas y el contador se resetea a 0 (acumulativo y sobrevive entre detonaciones). Genera 1 chatarra al final del turno si hay hueco.
-- **Activa [3]**: Consume TODA tu chatarra (cada una suma al contador del horno).
+- **Pasiva (Contador del Horno)**: Al final de tu turno, además tiene un contador de chatarra: cada chatarra consumida suma 1 al contador. Al llegar a 3 → 1 de daño a todas las unidades enemigas y el contador se resetea a 0 (acumulativo y sobrevive entre detonaciones). Genera 1 chatarra al final del turno si hay hueco.
+- **Activa [3] (Calcinar)**: Consume TODA tu chatarra (cada una suma al contador del horno).
 - **Unidades**:
   - **Titán (0/6)**: Consume hasta 2 chatarras (cada una suma al horno).
   - **Medio (2/2)**: Al morir, mejora 1 HP a una chatarra.
   - **Pequeño (0/1)**: Chatarra (no hace nada por sí sola).
 
-### 2. Swarm (Horda de drones)
+### 2. Swarm (Dron Enjambre)
 > *"Su enjambre de drones explota al morir: tu Titán fabrica más y tu activa los detona a todos."*
 - **Keywords**: Dron = Unidades pequeñas y medianas.
 - **Trait de equilibrio**: La primera ronda, siempre saldrá un 1 en el dado para poner una unidad pequeña.
-- **Pasiva**: Al morir un dron, hace 1 de daño a una unidad enemiga aleatoria.
-- **Activa [2]**: Sacrifica todas tus unidades pequeñas.
+- **Pasiva (Último aliento)**: Al morir un dron, hace 1 de daño a una unidad enemiga aleatoria.
+- **Activa [2] (PEM)**: Sacrifica todos tus drones (pequeños y medianos).
 - **Unidades**:
   - **Titán (0/6)**: Genera dos unidades pequeñas.
   - **Medio (0/2)**: Cada ronda, añade 1 de daño a un dron adyacente.
@@ -100,17 +100,17 @@ Cada personaje dispone de 3 tipos de unidades con estadísticas específicas `(d
 
 ### 3. Cyborg
 > *"La tensión es tu arma, generas mucha tensión pasiva que hace aumentar tu daño."*
-- **Pasiva**: Al final de tu turno, +1 de tensión por aliado vivo (máx +3).
-- **Activa [1]**: Por cada 20 de tensión que tengas, tu ataque de esta ronda hace +1 de daño extra.
+- **Pasiva (Coro del pueblo)**: Al final de tu turno, +1 de tensión por aliado vivo (máx +3).
+- **Activa [1] (Bioimpacto)**: Ataca a un enemigo infligiendo 1 de daño más 1 de daño adicional por cada 20 de tensión que tengas.
 - **Unidades**:
   - **Titán (0/6)**: Ganas 5 de tensión.
   - **Medio (1/2)**: Cada ronda, otorga escudo a una unidad adyacente.
   - **Pequeño (1/1)**: Si tiene unidades adyacentes, gana 1 de ataque.
 
-### 4. RoboHand
+### 4. El Brazo
 > *"La mano que coloca todo donde quiere."*
-- **Pasiva**: Los ataques mueven a las unidades hacia una casilla superior; si no hay superior, la manda abajo del todo.
-- **Activa [3]**: Mueve 1 unidad enemiga a una casilla aleatoria libre y hazle 1 de daño. Si no se puede mover, hazle 2 de daño.
+- **Pasiva (Línea de montaje)**: Los ataques mueven a las unidades hacia una casilla superior; si no hay superior, la manda abajo del todo.
+- **Activa [3] (Desplazar)**: Mueve 1 unidad enemiga a una casilla aleatoria libre y hazle 1 de daño. Si no se puede mover, hazle 2 de daño.
 - **Unidades**:
   - **Titán (0/5)**: Intercambia la posición con otra unidad y les otorga a ambos 1 de ataque extra.
   - **Medio (0/2)**: Cada ronda que se mueve una unidad enemiga, gana 1 de ataque.
@@ -118,17 +118,17 @@ Cada personaje dispone de 3 tipos de unidades con estadísticas específicas `(d
 
 ### 5. Taladro
 > *"Excavar te rompe poco a poco, el Taladro ha hecho de esto algo útil."*
-- **Pasiva**: Cuando un aliado recibe daño, gana 1 de ataque extra.
-- **Activa [2]**: Hace 1 de daño a todas las unidades de ambos tableros.
+- **Pasiva (Voz de la experiencia)**: Cuando un aliado recibe daño, gana 1 de ataque extra.
+- **Activa [2] (Terraformar)**: Hace 1 de daño a todas las unidades de ambos tableros.
 - **Unidades**:
   - **Titán (0/6)**: Cura completamente a la unidad con menos vida.
   - **Medio (3/2)**: Al morir, otorga 1 de daño a una unidad aliada aleatoria.
-  - **Pequeño (0/3)**: Al morir, realiza 1 de daño en su casilla homóloga.
+  - **Pequeño (0/3)**: Al morir, realiza 1 de daño en su casilla homóloga contraria.
 
 ### 6. Holo
 > *"Sabes que es lo mejor de un holograma? Que no lo puedes tocar."*
-- **Pasiva**: Otorga escudo a una unidad aleatoria.
-- **Activa [1]**: Convierte los escudos en +1/+1 de daño y vida.
+- **Pasiva (Proyección Vocal)**: Otorga escudo a una unidad aleatoria.
+- **Activa [1] (Prestigio)**: Convierte los escudos en +1/+1 de daño y vida.
 - **Unidades**:
   - **Titán (0/5)**: Su daño se iguala a su vida (inicia en 5/5).
   - **Medio (1/2)**: Cada vez que el enemigo recibe daño, esta unidad recibe un escudo.

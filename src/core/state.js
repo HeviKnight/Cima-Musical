@@ -22,6 +22,38 @@ export const KILL_TENSION = {
   TITAN: 50
 };
 
+/**
+ * Devuelve la tensión otorgada al matar una unidad según su tipo.
+ * @param {object} pawn - Unidad eliminada
+ * @returns {number}
+ */
+export function getKillTension(pawn) {
+  if (pawn.isTitan) return KILL_TENSION.TITAN;
+  if (pawn.unitType === 'mediana') return KILL_TENSION.MEDIANA;
+  return KILL_TENSION.PEQUENA;
+}
+
+/**
+ * Aplica daño a una unidad absorbiendo escudo primero.
+ * @param {object} pawn - Unidad objetivo
+ * @param {number} [amount=1] - Cantidad de daño
+ * @returns {{ absorbed: number, actualDamage: number, isDead: boolean }}
+ */
+export function applyDamageToPawn(pawn, amount = 1) {
+  let absorbed = 0;
+  let remaining = amount;
+  if (pawn.shield > 0) {
+    absorbed = Math.min(pawn.shield, remaining);
+    pawn.shield -= absorbed;
+    remaining -= absorbed;
+  }
+  const actualDamage = remaining;
+  if (actualDamage > 0) {
+    pawn.hp -= actualDamage;
+  }
+  return { absorbed, actualDamage, isDead: pawn.hp <= 0 };
+}
+
 export function getHpForDiceRoll(roll) {
   const r = parseInt(roll, 10) || 1;
   if (r === 6) return 6; // Habilidad de Titán / Titán
@@ -125,13 +157,14 @@ export function getStrongestUnit(pawns) {
   const scored = living.map(p => ({
     pawn: p,
     total: (p.atk || 0) + (p.hp || 0),
-    atk: p.atk || 0
+    atk: p.atk || 0,
+    tiebreaker: Math.random()
   }));
 
   scored.sort((a, b) => {
     if (b.total !== a.total) return b.total - a.total;
     if (b.atk !== a.atk) return b.atk - a.atk;
-    return Math.random() - 0.5;
+    return a.tiebreaker - b.tiebreaker;
   });
 
   return scored[0].pawn;
@@ -147,13 +180,14 @@ export function getWeakestUnit(pawns) {
   const scored = living.map(p => ({
     pawn: p,
     total: (p.atk || 0) + (p.hp || 0),
-    atk: p.atk || 0
+    atk: p.atk || 0,
+    tiebreaker: Math.random()
   }));
 
   scored.sort((a, b) => {
     if (a.total !== b.total) return a.total - b.total;
     if (a.atk !== b.atk) return a.atk - b.atk;
-    return Math.random() - 0.5;
+    return a.tiebreaker - b.tiebreaker;
   });
 
   return scored[0].pawn;
@@ -174,7 +208,7 @@ export class GameState {
     return {
       character: null,            // Objeto CHARACTERS
       maxAbilityCharges: 1,       // Cargas totales según personaje (coste de su activa)
-      activeAbilityCharges: 0,    // Cargas de habilidad disponibles
+      activeAbilityCharges: 1,    // Cargas de habilidad disponibles (inicia con todas las cargas)
       prestige: 0,                // 0 a 100 puntos de tensión
       pawns: [],                  // Array de { id, row, col, atk, hp, maxHp, isTitan, unitType, shield, sprite, name }
       pendingPawn: null,          // Unidad obtenida en la tirada
@@ -186,6 +220,7 @@ export class GameState {
       hornoCount: 0,              // Contador del Horno (Incinerador: detona cada 3 chatarras)
       isDustCloudActive: false,   // Nube de polvo activa
       holoRedirectUsed: false,    // Pasiva Holo usada esta ronda
+      holoMediumShieldNextRound: false, // Prisma Holográfico: gana escudo la ronda siguiente tras disparar a una unidad
       isCyborgBoosted: false      // Activa Cyborg armada para esta ronda
     };
   }
@@ -239,21 +274,7 @@ export class GameState {
       p.holoRedirectUsed = false;
       p.isCyborgBoosted = false;
 
-      // Caducar escudos al final de cada ronda
-      if (p.pawns) {
-        p.pawns.forEach(pawn => {
-          if (pawn) {
-            pawn.shield = 0;
-            // Holo Titán: su daño se iguala a su vida
-            if (pawn.isTitan && p.character?.id === 'holo') {
-              pawn.atk = pawn.hp;
-            }
-          }
-        });
-      }
-
-      // Recarga de habilidad: +1 carga por ronda hasta el máximo
-      this.addAbilityCharge(key, 1);
+      // Las cargas de habilidad NO se recargan por ronda (inician completas y se consumen de forma finita)
     });
 
     this.notify('roundReset');
@@ -266,7 +287,7 @@ export class GameState {
       p.prestige = 0;
       const char = p.character;
       const max = char?.activeAbility?.maxCharges || 1;
-      const init = char?.activeAbility?.initialCharges ?? 0;
+      const init = char?.activeAbility?.initialCharges ?? max;
       p.maxAbilityCharges = max;
       p.activeAbilityCharges = init;
       p.pawns = [];
@@ -278,6 +299,7 @@ export class GameState {
       p.hornoCount = 0;
       p.isDustCloudActive = false;
       p.holoRedirectUsed = false;
+      p.holoMediumShieldNextRound = false;
       p.isCyborgBoosted = false;
     });
 

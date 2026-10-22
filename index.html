@@ -5,10 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pasos y Putasos</title>
-    <link rel="icon" type="image/png" href="/assets/sprites/Dado.png">
+    <link rel="icon" type="image/png" href="/public/Favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Outfit:wght@400;600;700;900&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,100..700;1,100..700&display=swap"
+        rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
         rel="stylesheet">
 </head>
 
@@ -16,29 +19,13 @@
     <!-- ================= PANTALLA 1: MENÚ PRINCIPAL (ESTÁTICO EN HTML) ================= -->
     <div class="game-screen active-screen" id="screen-start">
         <div class="screen-card start-card">
-            <h1 class="main-game-title">CIMA MUSICAL</h1>
-            <p class="game-tagline">EL GRAN TORNEO POR DOMINAR LAS PLAYLISTS</p>
-
-            <!-- SELECCIÓN DE MODOS Y OPCIONES DEL MENÚ -->
-            <div class="menu-buttons-container">
-                <button class="arcade-main-btn mode-btn placeholder-btn" id="btn-mode-story">
-                    <span class="btn-text">MODO HISTORIA</span>
-                    <span class="btn-badge">PRÓXIMAMENTE</span>
-                </button>
-                <button class="arcade-main-btn mode-btn" id="btn-mode-vs-ai">
-                    <span class="btn-text">1 PLAYER VS IA</span>
-                </button>
-                <button class="arcade-main-btn mode-btn" id="btn-mode-local">
-                    <span class="btn-text">1 VS 1 LOCAL</span>
-                </button>
-                <button class="arcade-secondary-btn mode-btn placeholder-btn" id="btn-mode-tutorial">
-                    <span class="btn-text">TUTORIAL</span>
-                    <span class="btn-badge">PRÓXIMAMENTE</span>
-                </button>
-                <button class="arcade-secondary-btn mode-btn placeholder-btn" id="btn-mode-settings">
-                    <span class="btn-text">AJUSTES</span>
-                    <span class="btn-badge">PRÓXIMAMENTE</span>
-                </button>
+            <img src="/Title.svg" alt="Duelos de Acero" class="start-title-logo">
+            <div class="start-menu-buttons">
+                <button id="btn-mode-vs-ai">1P vs IA</button>
+                <button id="btn-mode-local">1P vs 1P</button>
+            </div>
+            <div class="start-floating-logo-wrapper">
+                <img src="/Game_logo_white.svg" alt="Logo Pasos y Putasos" class="start-floating-logo">
             </div>
         </div>
     </div>

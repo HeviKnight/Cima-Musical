@@ -10,8 +10,8 @@ export const CHARACTERS = [
     difficulty: 'Medio ⭐⭐',
     style: 'Control y Daño Masivo por Horno',
     quote: 'Acumula chatarra para quemarla, dañando las unidades rivales.',
-    color: '#EF4444',
-    borderColor: '#B91C1C',
+    color: '#b02727',
+    borderColor: '#7a1919',
     bgColor: '#230303',
     iconSprite: '/assets/sprites/heroes/CH_Icon_Furnance.png',
     characterSprite: '/assets/sprites/heroes/CH_Sprite_Furnance.png',
@@ -26,16 +26,16 @@ export const CHARACTERS = [
     },
     passiveAbility: {
       id: 'chatarreria',
-      name: 'Horno de Chatarra',
+      name: 'Contador del Horno',
       description: 'Al final de tu turno, genera 1 chatarra y acumula el contador del horno: al llegar a 3 detonará 1 de daño AoE enemigo.'
     },
     activeAbility: {
       id: 'ignicion_horno',
-      name: 'Ignición del Horno',
+      name: 'Calcinar',
       cost: 1,
       maxCharges: 3,
-      initialCharges: 0,
-      description: 'Consume TODA tu chatarra (cada una suma al contador del horno).'
+      initialCharges: 3,
+      description: 'Añade +1 al horno y consume toda tu chatarra (cada una suma +1 al horno). ¡Al llegar a 3 detona 1 de daño a todos los enemigos!'
     },
     titanAbility: {
       id: 'purga_titan',
@@ -73,8 +73,8 @@ export const CHARACTERS = [
     difficulty: 'Fácil ⭐',
     style: 'Horda de Drones y Explosiones en Cadena',
     quote: 'Su enjambre de drones explota al morir: tu Titán fabrica más y tu activa los detona a todos.',
-    color: '#EAB308',
-    borderColor: '#CA8A04',
+    color: '#a49f32',
+    borderColor: '#736f20',
     bgColor: '#231c03',
     iconSprite: '/assets/sprites/heroes/CH_Icon_Swarm-drone.png',
     characterSprite: '/assets/sprites/heroes/CH_Sprite_Swarm-drone.png',
@@ -89,16 +89,16 @@ export const CHARACTERS = [
     },
     passiveAbility: {
       id: 'dron_kamikaze',
-      name: 'Carga Explosiva',
+      name: 'Último aliento',
       description: 'Al morir un dron (unidad pequeña o mediana), hace 1 de daño a una unidad enemiga aleatoria.'
     },
     activeAbility: {
       id: 'sacrificio_enjambre',
-      name: 'Sacrificio de Drones',
+      name: 'PEM',
       cost: 1,
       maxCharges: 2,
-      initialCharges: 0,
-      description: 'Sacrifica todas tus unidades pequeñas (activando la explosión de cada una).'
+      initialCharges: 2,
+      description: 'Sacrifica todos tus drones (pequeños y medianos), provocando que cada uno explote haciendo 1 de daño a un enemigo aleatorio.'
     },
     titanAbility: {
       id: 'reina_colmena',
@@ -136,8 +136,8 @@ export const CHARACTERS = [
     difficulty: 'Fácil ⭐',
     style: 'Tensión Pasiva y Finisher Devastador',
     quote: 'La tensión es tu arma, generas mucha tensión pasiva que hace aumentar tu daño.',
-    color: '#8B5CF6',
-    borderColor: '#7C3AED',
+    color: '#9c27b0',
+    borderColor: '#6a1b9a',
     bgColor: '#110323',
     iconSprite: '/assets/sprites/heroes/CH_Icon_Cyborg.png',
     characterSprite: '/assets/sprites/heroes/CH_Sprite_Cyborg.png',
@@ -148,16 +148,16 @@ export const CHARACTERS = [
     diceFaces: [1, 2, 3, 4, 5, 6],
     passiveAbility: {
       id: 'bateria_humana',
-      name: 'Batería Humana',
+      name: 'Coro del pueblo',
       description: 'Al final de tu turno, +1 de tensión por aliado vivo (máx +3).'
     },
     activeAbility: {
-      id: 'finisher_sobrecarga',
-      name: 'Finisher Cibernético',
+      id: 'bioimpacto',
+      name: 'Bioimpacto',
       cost: 1,
       maxCharges: 1,
-      initialCharges: 0,
-      description: 'Por cada 20 de tensión que tengas, tu ataque de esta ronda hace +1 de daño extra.'
+      initialCharges: 1,
+      description: 'Ataca a un enemigo infligiendo 1 de daño más 1 de daño adicional por cada 20 de tensión que tengas.'
     },
     titanAbility: {
       id: 'inyeccion_tension',
@@ -190,13 +190,13 @@ export const CHARACTERS = [
   },
   {
     id: 'el_brazo',
-    name: 'ROBOHAND',
+    name: 'EL BRAZO',
     tribeName: 'PÉRDIDA TOTAL DE LA HUMANIDAD',
     difficulty: 'Difícil ⭐⭐⭐',
     style: 'Control Posicional, Escudos y Negación',
     quote: 'La mano que coloca todo donde quiere.',
-    color: '#9CA3AF',
-    borderColor: '#4B5563',
+    color: '#9d9fa4',
+    borderColor: '#60646c',
     bgColor: '#212427',
     iconSprite: '/assets/sprites/heroes/CH_Icon_Robo-Hand.png',
     characterSprite: '/assets/sprites/heroes/CH_Sprite_Robo-hand.png',
@@ -207,15 +207,15 @@ export const CHARACTERS = [
     diceFaces: [1, 2, 3, 4, 5, 6],
     passiveAbility: {
       id: 'mano_desplazamiento',
-      name: 'Impulso Vertical',
+      name: 'Línea de montaje',
       description: 'Los ataques mueven a las unidades hacia una casilla superior; si no hay superior, la manda abajo del todo.'
     },
     activeAbility: {
       id: 'agarre_cibernetico',
-      name: 'Reubicación Forzada',
+      name: 'Desplazar',
       cost: 1,
       maxCharges: 3,
-      initialCharges: 0,
+      initialCharges: 3,
       description: 'Mueve 1 unidad enemiga a una casilla aleatoria libre y hazle 1 de daño. Si no se puede mover, hazle 2 de daño.'
     },
     titanAbility: {
@@ -225,7 +225,7 @@ export const CHARACTERS = [
     },
     units: {
       titan: {
-        name: 'Titán RoboHand',
+        name: 'Titán El Brazo',
         atk: 0,
         hp: 5,
         sprite: '/assets/sprites/pawns/PW_RoboHand_Titan.png',
@@ -254,8 +254,8 @@ export const CHARACTERS = [
     difficulty: 'Medio ⭐⭐',
     style: 'Disrupción, Camuflaje y Recompensa de Bajas',
     quote: 'Excavar te rompe poco a poco, el Taladro ha hecho de esto algo útil.',
-    color: '#92400E',
-    borderColor: '#78350F',
+    color: '#a46432',
+    borderColor: '#73411b',
     bgColor: '#231103',
     iconSprite: '/assets/sprites/heroes/CH_Icon_Drill.png',
     characterSprite: '/assets/sprites/heroes/CH_Sprite_Drill.png',
@@ -266,15 +266,15 @@ export const CHARACTERS = [
     diceFaces: [1, 2, 3, 4, 5, 6],
     passiveAbility: {
       id: 'resiliencia_sismica',
-      name: 'Resiliencia Sísmica',
+      name: 'Voz de la experiencia',
       description: 'Cuando un aliado recibe daño, gana 1 de ataque extra.'
     },
     activeAbility: {
       id: 'falla_tectonica',
-      name: 'Falla Tectónica',
+      name: 'Terraformar',
       cost: 1,
       maxCharges: 2,
-      initialCharges: 0,
+      initialCharges: 2,
       description: 'Hace 1 de daño a todas las unidades de ambos tableros.'
     },
     titanAbility: {
@@ -313,8 +313,8 @@ export const CHARACTERS = [
     difficulty: 'Medio ⭐⭐',
     style: 'Engaño, Desvío de Daño y Clonación',
     quote: 'Sabes que es lo mejor de un holograma? Que no lo puedes tocar.',
-    color: '#06B6D4',
-    borderColor: '#0891B2',
+    color: '#32a48b',
+    borderColor: '#1d6e5c',
     bgColor: '#032319',
     iconSprite: '/assets/sprites/heroes/CH_Icon_Holo.png',
     characterSprite: '/assets/sprites/heroes/CH_Sprite_Holo.png',
@@ -325,36 +325,36 @@ export const CHARACTERS = [
     diceFaces: [1, 2, 3, 4, 5, 6],
     passiveAbility: {
       id: 'escudo_holografico',
-      name: 'Escudo Holográfico',
+      name: 'Proyección Vocal',
       description: 'Otorga escudo a una unidad aleatoria.'
     },
     activeAbility: {
       id: 'sobrecarga_escudos',
-      name: 'Sobrecarga de Escudos',
+      name: 'Prestigio',
       cost: 1,
       maxCharges: 1,
-      initialCharges: 0,
+      initialCharges: 1,
       description: 'Convierte los escudos en +1/+1 de daño y vida.'
     },
     titanAbility: {
       id: 'dano_por_vida',
       name: 'Reflejo Vital',
-      description: 'Su daño se iguala a su vida. Con un 6 en el dado, si no es posible otra acción, +1/+1 a la unidad más fuerte.'
+      description: 'Con un 6 en el dado, su daño se iguala a su vida. Si el Titán ha muerto, +1/+1 a la unidad más fuerte.'
     },
     units: {
       titan: {
         name: 'Titán Holo',
-        atk: 5,
+        atk: 0,
         hp: 5,
         sprite: '/assets/sprites/pawns/PW_Holo_Titan.png',
-        description: 'Su daño se iguala a su vida (inicialmente 5/5).'
+        description: 'Su daño se iguala a su vida con dado 6 (inicialmente 0/5).'
       },
       mediana: {
         name: 'Prisma Holográfico',
         atk: 1,
         hp: 2,
         sprite: '/assets/sprites/pawns/PW_Holo_Medium.png',
-        description: 'Cada vez que el enemigo recibe daño, esta unidad recibe un escudo.'
+        description: 'La ronda siguiente a la que el jugador dispara a una unidad, esta unidad recibe un escudo.'
       },
       pequena: {
         name: 'Espejo Frágil',

@@ -2,6 +2,81 @@
 // DEFINICIÓN DE TRIBUS Y PERSONAJES (DATA)
 // ===================================================
 
+// Esquemas de visualización disponibles
+export const CONTROL_SCHEMES = {
+  KEYBOARD: 'keyboard',
+  DANCE_MAT: 'dance_mat'
+};
+
+// Iconos e indicadores para el modo alfombra de baile (matriz 3x3)
+// Fila 0: [X, Arriba, O]
+// Fila 1: [Izquierda, Centro / Stay Cool, Derecha]
+// Fila 2: [Triángulo, Abajo, Cuadrado]
+export const DANCE_MAT_MATRIX = [
+  [
+    { symbol: '✖', label: 'Cruz', iconClass: 'mat-cross', color: '#60a5fa' },
+    { symbol: '⬆', label: 'Arriba', iconClass: 'mat-up', color: '#38bdf8' },
+    { symbol: '⭕', label: 'Círculo', iconClass: 'mat-circle', color: '#60a5fa' }
+  ],
+  [
+    { symbol: '⬅', label: 'Izquierda', iconClass: 'mat-left', color: '#f43f5e' },
+    { symbol: '★', label: 'Centro', iconClass: 'mat-center', color: '#e2e8f0' },
+    { symbol: '➡', label: 'Derecha', iconClass: 'mat-right', color: '#f43f5e' }
+  ],
+  [
+    { symbol: '▲', label: 'Triángulo', iconClass: 'mat-triangle', color: '#60a5fa' },
+    { symbol: '⬇', label: 'Abajo', iconClass: 'mat-down', color: '#38bdf8' },
+    { symbol: '■', label: 'Cuadrado', iconClass: 'mat-square', color: '#60a5fa' }
+  ]
+];
+
+let currentControlScheme = localStorage.getItem('cima_control_scheme') || CONTROL_SCHEMES.KEYBOARD;
+
+export function getControlScheme() {
+  return currentControlScheme;
+}
+
+export function setControlScheme(scheme) {
+  if (scheme === CONTROL_SCHEMES.KEYBOARD || scheme === CONTROL_SCHEMES.DANCE_MAT) {
+    currentControlScheme = scheme;
+    try {
+      localStorage.setItem('cima_control_scheme', scheme);
+    } catch (e) {
+      // Ignorar errores de localStorage si está bloqueado
+    }
+  }
+}
+
+export function toggleControlScheme() {
+  const next = currentControlScheme === CONTROL_SCHEMES.KEYBOARD
+    ? CONTROL_SCHEMES.DANCE_MAT
+    : CONTROL_SCHEMES.KEYBOARD;
+  setControlScheme(next);
+  return next;
+}
+
+export function getCellDisplay(row, col, key = '') {
+  if (currentControlScheme === CONTROL_SCHEMES.DANCE_MAT) {
+    const item = DANCE_MAT_MATRIX[row]?.[col];
+    if (item) {
+      return {
+        isDanceMat: true,
+        symbol: item.symbol,
+        label: item.label,
+        iconClass: item.iconClass,
+        color: item.color
+      };
+    }
+  }
+  return {
+    isDanceMat: false,
+    symbol: key.toUpperCase(),
+    label: key.toUpperCase(),
+    iconClass: 'key-text',
+    color: '#ffffff'
+  };
+}
+
 export const CONTROLS = {
   p1: {
     id: 'p1',

@@ -65,4 +65,4 @@ src/
 ## 5. Directrices de Mantenimiento
 - **No romper la compatibilidad**: Mantener los alias heredados cuando sea necesario.
 - **Mantener estética pixel art**: Respetar fuentes (`Press Start 2P`, `monospace`), colores de las tribus y renderizado nítido (`image-rendering: pixelated`).
-- **Control de tensión**: Recordar que los peones comunes no otorgan tensión por daño; solo al destruirlos (+15) o mediante habilidades explícitas.
+- **Control de tensión**: Ganancia por bajas: Pequeña (+8), Mediana (+16), Titán (+50). Al final de cada ronda, cada unidad viva genera tensión igual a su daño (ataque). La meta de victoria son 100 puntos de tensión.

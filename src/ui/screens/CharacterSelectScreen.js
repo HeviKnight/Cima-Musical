@@ -4,10 +4,11 @@
 // ===================================================
 
 import { CHARACTERS } from '../../data/characters.js';
+import { getControlScheme, toggleControlScheme, CONTROL_SCHEMES } from '../../data/controls.js';
 
 export function renderCharacterSelectScreen(gameMode = 'vs-ai', onSelectionFinished, onNavigateHome = null) {
-  const container = document.createElement('div');
-  container.className = 'game-screen active-screen';
+  const container = document.createElement('main');
+  container.className = 'game-screen active-screen screen-card char-select-card arcade-select-card char-select-arcade-layout';
   container.id = 'screen-char-select';
 
   let currentStep = 'p1'; // 'p1' o 'p2'
@@ -50,21 +51,24 @@ export function renderCharacterSelectScreen(gameMode = 'vs-ai', onSelectionFinis
     `;
   }
 
-  container.innerHTML = `
-    <div class="screen-card char-select-card arcade-select-card">
-      <main class="char-select-arcade-layout">
-        <!-- DIV 1: PANEL IZQUIERDO (P1) -->
-        ${generatePanelHTML('p1')}
+  const isDanceMatActive = getControlScheme() === CONTROL_SCHEMES.DANCE_MAT;
 
-        <!-- DIV 2: PANEL CENTRAL (SELECT PANEL) -->
-        <div class="char-center-section" id="select-panel">
+  container.innerHTML = `
+    <!-- PANEL IZQUIERDO (P1) -->
+    ${generatePanelHTML('p1')}
+
+    <!-- PANEL CENTRAL (SELECT PANEL) -->
+    <div class="char-center-section" id="select-panel">
           <header class="select-panel-header">
             <div class="char-nav-controls">
               <button class="nav-icon-btn" id="btn-char-nav-home" title="Volver al Menú Principal">
-                <span class="nav-icon"><img src="/assets/sprites/UI/Icon_home.png" alt="Home"></span>
+                <span class="material-symbols-outlined nav-symbol">home</span>
               </button>
               <button class="nav-icon-btn" id="btn-char-nav-back" title="Volver Atrás">
-                <span class="nav-icon"><img src="/assets/sprites/UI/Icon_back.png" alt="Back"></span>
+                <span class="material-symbols-outlined nav-symbol">arrow_back</span>
+              </button>
+              <button class="nav-icon-btn nav-toggle-controls-btn ${isDanceMatActive ? 'active-mat-mode' : ''}" id="btn-char-toggle-controls" title="${isDanceMatActive ? 'Modo: Alfombra de baile (Clic para cambiar a Teclado)' : 'Modo: Teclado clásico (Clic para cambiar a Alfombra)'}">
+                <span class="nav-control-indicator">${isDanceMatActive ? '💃' : '⌨️'}</span>
               </button>
             </div>
             <h2 class="char-select-title">Selecciona tu sintético</h2>
@@ -92,10 +96,8 @@ export function renderCharacterSelectScreen(gameMode = 'vs-ai', onSelectionFinis
           </button>
         </div>
 
-        <!-- DIV 3: PANEL DERECHO (P2) -->
+        <!-- PANEL DERECHO (P2) -->
         ${generatePanelHTML('p2')}
-      </main>
-    </div>
   `;
 
   function updateSidePanel(playerKey, char, isCurrentTurn) {
@@ -153,34 +155,37 @@ export function renderCharacterSelectScreen(gameMode = 'vs-ai', onSelectionFinis
 
           ${char.trait ? `
             <div class="ability-box trait-ability-box" style="border-color: #f59e0b;">
-              <div class="ability-title" style="color: #fbbf24;">⚙️ TRAIT: ${char.trait.name}</div>
+              <div class="ability-title" style="color: #fbbf24;">TRAIT: ${char.trait.name}</div>
               <div class="ability-desc">${char.trait.description}</div>
             </div>
           ` : ''}
 
           <div class="ability-box passive-ability-box">
-            <div class="ability-title">🛡️ PASIVA: ${char.passiveAbility?.name || 'Pasiva'}</div>
+            <div class="ability-title">PASIVA: ${char.passiveAbility?.name || 'Pasiva'}</div>
             <div class="ability-desc">${char.passiveAbility?.description || 'Efecto pasivo constante'}</div>
           </div>
 
           <div class="ability-box active-ability-box">
-            <div class="ability-title">⚡ ACTIVA [1 Carga]: ${char.activeAbility?.name || 'Activa'}</div>
+            <div class="ability-title">ACTIVA [1 Carga]: ${char.activeAbility?.name || 'Activa'}</div>
             <div class="ability-desc">${char.activeAbility?.description || 'Habilidad especial de combate'}</div>
-            <div class="ability-charges">Coste: <strong>1 Carga</strong> (Capacidad máx: <strong>${char.activeAbility?.maxCharges || 1}</strong>)</div>
+            <div class="ability-charges" style="display: flex; align-items: center; gap: 6px; margin-top: 4px;">
+              <img src="/assets/sprites/UI/UI_Hero_Skill.svg" style="width: 16px; height: 16px; object-fit: contain;" alt="Carga" />
+              <span>Coste: <strong>1 Carga</strong> (Capacidad máx: <strong>${char.activeAbility?.maxCharges || 1}</strong>)</span>
+            </div>
           </div>
 
           <div class="ability-box titan-ability-box" style="border-color: #ec4899;">
-            <div class="ability-title" style="color: #f472b6;">👑 TITÁN (CON DADO 6): ${char.titanAbility?.name || 'Habilidad Titán'}</div>
+            <div class="ability-title" style="color: #f472b6;">TITÁN (CON DADO 6): ${char.titanAbility?.name || 'Habilidad Titán'}</div>
             <div class="ability-desc">${char.titanAbility?.description || 'Boost titánico al sacar un 6'}</div>
           </div>
 
           ${char.units ? `
             <div class="ability-box units-overview-box" style="border-color: #38bdf8; background: rgba(15, 23, 42, 0.6);">
-              <div class="ability-title" style="color: #38bdf8;">♟️ UNIDADES (DAÑO/VIDA)</div>
+              <div class="ability-title" style="color: #38bdf8;">UNIDADES (DAÑO/VIDA)</div>
               <div class="ability-desc" style="display: flex; flex-direction: column; gap: 3px; font-size: 0.62rem;">
-                <div><strong>👑 Titán (${char.units.titan.atk}/${char.units.titan.hp})</strong>: ${char.units.titan.description}</div>
-                <div><strong>🗼 Mediana (${char.units.mediana.atk}/${char.units.mediana.hp})</strong>: ${char.units.mediana.description}</div>
-                <div><strong>♟ Pequeña (${char.units.pequena.atk}/${char.units.pequena.hp})</strong>: ${char.units.pequena.description}</div>
+                <div><strong>Titán (${char.units.titan.atk}/${char.units.titan.hp})</strong>: ${char.units.titan.description}</div>
+                <div><strong>Mediana (${char.units.mediana.atk}/${char.units.mediana.hp})</strong>: ${char.units.mediana.description}</div>
+                <div><strong>Pequeña (${char.units.pequena.atk}/${char.units.pequena.hp})</strong>: ${char.units.pequena.description}</div>
               </div>
             </div>
           ` : ''}
@@ -220,10 +225,12 @@ export function renderCharacterSelectScreen(gameMode = 'vs-ai', onSelectionFinis
     }
 
     if (btnTextEl) {
-      if (gameMode === 'local' && currentStep === 'p1') {
+      if (gameMode === 'vs-ai') {
+        btnTextEl.textContent = p1SelectedChar ? '¡CONFIRMAR Y COMBATIR!' : 'ELIGE TU SINTÉTICO';
+      } else if (currentStep === 'p1') {
         btnTextEl.textContent = p1SelectedChar ? 'CONFIRMAR P1' : 'ELIGE P1';
       } else {
-        btnTextEl.textContent = activeSelected ? 'CONFIRMAR P2' : 'ELIGE P2';
+        btnTextEl.textContent = p2SelectedChar ? 'CONFIRMAR P2 Y COMBATIR' : 'ELIGE P2';
       }
     }
 
@@ -336,6 +343,10 @@ export function renderCharacterSelectScreen(gameMode = 'vs-ai', onSelectionFinis
           const playable = CHARACTERS.filter(c => c.isPlayable);
           const p2Opts = playable.filter(c => c.id !== p1SelectedChar.id);
           p2FinalChar = p2Opts.length > 0 ? p2Opts[Math.floor(Math.random() * p2Opts.length)] : playable[0];
+        } else if (p2FinalChar && p1SelectedChar && p2FinalChar.id === p1SelectedChar.id) {
+          const playable = CHARACTERS.filter(c => c.isPlayable);
+          const altOpts = playable.filter(c => c.id !== p1SelectedChar.id);
+          if (altOpts.length > 0) p2FinalChar = altOpts[0];
         }
 
         if (onSelectionFinished) {
@@ -372,6 +383,23 @@ export function renderCharacterSelectScreen(gameMode = 'vs-ai', onSelectionFinis
           onNavigateHome();
         }
       }
+    });
+  }
+
+  // Botón para alternar esquema de controles (Teclado vs Alfombra de Baile)
+  const toggleControlsBtn = container.querySelector('#btn-char-toggle-controls');
+  if (toggleControlsBtn) {
+    toggleControlsBtn.addEventListener('click', () => {
+      const nextScheme = toggleControlScheme();
+      const isMat = nextScheme === CONTROL_SCHEMES.DANCE_MAT;
+      const indicator = toggleControlsBtn.querySelector('.nav-control-indicator');
+      if (indicator) {
+        indicator.textContent = isMat ? '💃' : '⌨️';
+      }
+      toggleControlsBtn.classList.toggle('active-mat-mode', isMat);
+      toggleControlsBtn.title = isMat
+        ? 'Modo: Alfombra de baile (Clic para cambiar a Teclado)'
+        : 'Modo: Teclado clásico (Clic para cambiar a Alfombra)';
     });
   }
 

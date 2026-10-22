@@ -4,17 +4,22 @@
 // (P1 Panel Izquierdo - Sección Central - P2 Panel Derecho)
 // ===================================================
 
-import { CONTROLS } from '../../data/controls.js';
+import { CONTROLS, getCellDisplay, getControlScheme, CONTROL_SCHEMES } from '../../data/controls.js';
 import { gameState } from '../../core/state.js';
 
 function renderGridButtons(playerKey) {
   const ctrl = CONTROLS[playerKey];
   return ctrl.keyMatrix.flatMap((row, r) =>
-    row.map((key, c) => `
-      <button class="casilla-btn" data-key="${key}" data-row="${r}" data-col="${c}" data-player="${playerKey}">
-        <span class="key-tag">${key.toUpperCase()}</span>
-      </button>`
-    )
+    row.map((key, c) => {
+      const display = getCellDisplay(r, c, key);
+      const tagContent = display.isDanceMat
+        ? `<span class="mat-icon-tag ${display.iconClass}" title="${display.label}">${display.symbol}</span>`
+        : display.symbol;
+      return `
+      <button class="casilla-btn ${display.isDanceMat ? 'is-mat-mode' : ''}" data-key="${key}" data-row="${r}" data-col="${c}" data-player="${playerKey}">
+        <span class="key-tag">${tagContent}</span>
+      </button>`;
+    })
   ).join('');
 }
 
@@ -57,8 +62,13 @@ function renderPlayerStage(playerKey) {
     <section class="game-side-panel char-side-panel ${isP1 ? 'p1-side-panel' : 'p2-side-panel'}" id="player-${playerNum}-panel" style="${panelStyle}">
       <!-- Cabecera de Jugador: Badge y Nombre -->
       <header class="side-panel-header">
-        <span class="side-panel-badge ${playerKey}-badge">${playerTag}</span>
-        <span class="player-char-title">${charName}</span>
+        ${isP1 ? `
+          <span class="side-panel-badge ${playerKey}-badge">${playerTag}</span>
+          <span class="player-char-title">${charName}</span>
+        ` : `
+          <span class="player-char-title">${charName}</span>
+          <span class="side-panel-badge ${playerKey}-badge">${playerTag}</span>
+        `}
       </header>
 
       <!-- Stage del Personaje (Sprite animado) -->
@@ -72,12 +82,31 @@ function renderPlayerStage(playerKey) {
 
       <!-- Contenedor conjunto de Barra de Tensión -->
       <div class="prestige-section-wrapper ${playerKey}-prestige-section">
-        ${char.id === 'incinerador' ? `
-          <div class="horno-counter-badge" id="${playerKey}-horno-badge" title="Contador del Horno" style="margin-bottom: 6px;">
-            <span class="horno-icon">🔥</span>
-            <span class="horno-text" id="${playerKey}-horno-text">0/3</span>
+        <!-- Indicadores visuales de cargas encima de la barra de tensión -->
+        <div class="prestige-charges-row ${char.id === 'incinerador' ? 'has-furnace' : ''}" id="${playerKey}-charges-row">
+          <div class="hero-charges-bar" id="${playerKey}-charges-slots" title="Cargas de Habilidad">
+            ${Array.from({ length: char.activeAbility?.maxCharges || 1 }).map((_, i) => {
+              const currentCharges = gameState[playerKey]?.activeAbilityCharges ?? (char.activeAbility?.initialCharges ?? char.activeAbility?.maxCharges ?? 1);
+              const isAvailable = i < currentCharges;
+              return `
+                <div class="charge-icon-slot ${isAvailable ? 'active' : 'empty'}" title="Carga ${i + 1}/${char.activeAbility?.maxCharges || 1} ${isAvailable ? 'Disponible' : 'Vacía'}">
+                  <img src="${isAvailable ? '/assets/sprites/UI/UI_Hero_Skill.svg' : '/assets/sprites/UI/UI_Hero_Skill_empty.svg'}"
+                       class="charge-icon-img ${isAvailable ? 'charge-full' : 'charge-empty'}"
+                       alt="${isAvailable ? 'Carga Activa' : 'Carga Vacía'}" draggable="false" />
+                </div>
+              `;
+            }).join('')}
           </div>
-        ` : ''}
+          ${char.id === 'incinerador' ? `
+            <div class="furnace-charges-bar" id="${playerKey}-furnace-slots" title="Cargas del Horno (Acumula 3 para detonar)">
+              ${Array.from({ length: 3 }).map((_, i) => `
+                <div class="furnace-scrap-slot empty" title="Horno ${i + 1}/3 Vacío">
+                  <img src="/assets/sprites/UI/UI_Furnance_Scrap_empty.svg" class="furnace-scrap-img scrap-empty" alt="Horno Vacío" />
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+        </div>
 
         <!-- Barra de Tensión / Prestigio ocupando todo el ancho debajo del personaje -->
         <div class="prestige-widget full-width-prestige" id="${playerKey}-prestige-widget" title="Medidor de Prestigio Jugador ${playerNum}">
@@ -101,8 +130,10 @@ function renderPlayerStage(playerKey) {
         <span class="ready-checkbox-custom">
           <span class="ready-checkmark">✔</span>
         </span>
-        <span class="ready-key-badge">${isP1 ? 'ESPACIO' : 'ENTER'}</span>
-        <span class="ready-text-label" id="${playerKey}-ready-text-label">LISTO</span>
+        <span class="ready-text-inline">
+          <span class="ready-key-badge">[${getControlScheme() === CONTROL_SCHEMES.DANCE_MAT ? 'START' : (isP1 ? 'ESPACIO' : 'ENTER')}]</span>
+          <span class="ready-text-label" id="${playerKey}-ready-text-label">LISTO</span>
+        </span>
       </div>
     </section>
   `;
@@ -110,7 +141,7 @@ function renderPlayerStage(playerKey) {
 
 function renderPlayerBoard(playerKey) {
   const isP1 = playerKey === 'p1';
-  const initialKey = isP1 ? 'S' : 'K';
+  const initialKey = getControlScheme() === CONTROL_SCHEMES.DANCE_MAT ? 'START' : (isP1 ? 'ESPACIO' : 'ENTER');
   const char = gameState[playerKey]?.character || (isP1 ? CONTROLS.p1 : CONTROLS.p2);
   const themeColor = char.color || (isP1 ? '#8B5CF6' : '#EF4444');
   const borderColor = char.borderColor || (isP1 ? '#7C3AED' : '#B91C1C');
@@ -153,6 +184,7 @@ function renderPlayerBoard(playerKey) {
               ${curtainAvatarHTML}
             </div>
             <div class="curtain-title" id="${playerKey}-curtain-title">TIRAR DADO</div>
+            <p class="curtain-desc" id="${playerKey}-curtain-desc" style="display: none;"></p>
             <div class="curtain-key-cap" id="${playerKey}-curtain-key">${initialKey}</div>
           </div>
         </div>
@@ -162,8 +194,8 @@ function renderPlayerBoard(playerKey) {
 }
 
 export function renderGameScreen(onNavigateHome = null) {
-  const container = document.createElement('div');
-  container.className = 'game-screen active-screen';
+  const container = document.createElement('main');
+  container.className = 'game-screen active-screen screen-card game-battle-card battle-arcade-layout';
   container.id = 'screen-game';
 
   const p1Char = gameState.p1?.character || CONTROLS.p1;
@@ -178,50 +210,50 @@ export function renderGameScreen(onNavigateHome = null) {
   const p2Bg = p2Char.bgColor || '#230303';
 
   container.innerHTML = `
-    <div class="screen-card game-battle-card arcade-select-card" id="game-wrapper">
-      <main class="battle-arcade-layout">
-        <!-- ZONA SUPERIOR: ESQUINAS CON PERSONAJES & CENTRO CON RONDA/TIMER -->
-        <div class="battle-top-section">
-          <!-- ESQUINA SUPERIOR IZQUIERDA: P1 -->
-          ${renderPlayerStage('p1')}
+    <!-- PANEL LATERAL IZQUIERDO: JUGADOR 1 (Ocupa todo el alto pegado al borde izquierdo) -->
+    ${renderPlayerStage('p1')}
 
-          <!-- CENTRO SUPERIOR: BOTÓN HOME, RONDA Y TEMPORIZADOR -->
-          <div class="game-center-section" id="battle-center-panel">
-            <div class="center-top-bar">
-              <button class="nav-icon-btn" id="btn-game-nav-home" title="Volver al Menú Principal">
-                <span class="nav-icon"><img src="/assets/sprites/UI/Icon_home.png" alt="Home"></span>
-              </button>
-            </div>
-
-            <div class="central-round-wrapper">
-              <div class="round-counter-header">
-                <span class="round-counter-label">RONDA</span>
-                <span class="round-counter-num" id="round-num-val">1</span>
-              </div>
-              <div class="phase-tag-banner phase-placement" id="round-drawer-badge">
-                <span id="round-drawer-text">COLOCAR</span>
-              </div>
-            </div>
-
-            <div class="central-timer-wrapper" id="shared-big-countdown">
-              <span class="central-timer-label">TIEMPO</span>
-              <span class="countdown-big-num" id="shared-countdown-num">3</span>
-            </div>
-          </div>
-
-          <!-- ESQUINA SUPERIOR DERECHA: P2 -->
-          ${renderPlayerStage('p2')}
+    <!-- SECCIÓN CENTRAL: CABECERA SUPERIOR PEGADA A LOS BORDES + TABLERO EN MEDIO -->
+    <div class="battle-center-section game-center-section" id="battle-center-panel">
+      <!-- DIV SUPERIOR PEGADO A LOS BORDES (Home, Contador de Rondas, Fases, Timer) -->
+      <header class="battle-center-header" id="battle-top-bar">
+        <div class="center-header-left">
+          <button class="nav-icon-btn" id="btn-game-nav-home" title="Volver al Menú Principal">
+            <span class="material-symbols-outlined nav-symbol">home</span>
+          </button>
         </div>
 
-        <!-- ZONA INFERIOR: CONTENEDOR CON AMBOS TABLEROS PEGADOS -->
-        <div class="battle-bottom-boards-container" id="battle-boards-container">
-          <div class="boards-cluster" id="boards-cluster">
-            ${renderPlayerBoard('p1')}
-            ${renderPlayerBoard('p2')}
+        <div class="central-round-wrapper">
+          <div class="round-counter-header">
+            <span class="round-counter-label">RONDA</span>
+            <span class="round-counter-num" id="round-num-val">1</span>
+          </div>
+          <div class="phase-tag-banner phase-placement" id="round-drawer-badge">
+            <span id="round-drawer-text">COLOCAR</span>
           </div>
         </div>
-      </main>
+
+        <div class="center-header-right">
+          <!-- Contador de tiempo (pausado temporalmente, se reactivará más adelante)
+          <div class="central-timer-wrapper" id="shared-big-countdown">
+            <span class="central-timer-label">TIEMPO</span>
+            <span class="countdown-big-num" id="shared-countdown-num">3</span>
+          </div>
+          -->
+        </div>
+      </header>
+
+      <!-- EL TABLERO EN MEDIO -->
+      <div class="battle-boards-container battle-bottom-boards-container" id="battle-boards-container">
+        <div class="boards-cluster" id="boards-cluster">
+          ${renderPlayerBoard('p1')}
+          ${renderPlayerBoard('p2')}
+        </div>
+      </div>
     </div>
+
+    <!-- PANEL LATERAL DERECHO: JUGADOR 2 (Ocupa todo el alto pegado al borde derecho) -->
+    ${renderPlayerStage('p2')}
   `;
 
   // Event listener para el botón de inicio/menú

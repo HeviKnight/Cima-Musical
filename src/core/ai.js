@@ -143,9 +143,9 @@ export function decideBotAction(botKey = 'p2') {
       return { useAbility: false };
 
     case 'holo': {
-      // Holo clona si tiene tropas no titánicas y hueco en su tablero
-      const nonTitans = myPawns.filter(p => !p.isTitan);
-      if (nonTitans.length >= 1 && myPawns.length < 9) {
+      // Holo activa Sobrecarga de Escudos si tiene al menos una unidad con escudo
+      const hasShields = myPawns.some(p => p && p.hp > 0 && p.shield > 0);
+      if (hasShields && Math.random() < 0.75) {
         return { useAbility: true };
       }
       return { useAbility: false };

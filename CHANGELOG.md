@@ -1,3 +1,80 @@
+# 📝 Notas del Parche — Versión 0.4.7: Sistema Integral de Partículas y Animaciones Visuales (Escudos, Daño, Stats y Muerte)
+
+## 🚀 Resumen del Lanzamiento
+Esta versión añade un conjunto completo de efectos visuales (FX), animaciones y partículas pixeladas para enriquecer el feedback de combate:
+1. **Ganancia de Escudos (Parpadeo Azul y Crecimiento)**:
+   - Al recibir un escudo (pasivas, habilidades activas o reclutamiento), la unidad crece (`scale: 1.32`) y parpadea en azul/cian durante **1 segundo** con un aura brillante (`#38bdf8` / `#0284c7`).
+   - Se emite una ráfaga radial de 14 partículas cuadradas pixeladas azules y cian que giran y se expanden desde la casilla.
+2. **Daño Recibido (Parpadeo Rojo Estroboscópico)**:
+   - Al ser golpeada, la unidad ejecuta un parpadeo estroboscópico rojo de alto contraste (`#ef4444` / `#dc2626`) con sacudida lateral de impacto durante 0.55s.
+   - Generación de chispas pixeladas de impacto en tonos rojos, ámbar y blancos disparadas desde el punto de impacto.
+3. **Mejoras de Estadísticas (Parpadeo Verde)**:
+   - Al conseguir estadísticas o mejoras de daño/vida (habilidad activa, dado 6 o tablero lleno), la unidad parpadea en **verde esmeralda brillante** (`#10b981` / `#34d399`) y se expande en tamaño.
+   - Partículas cuadradas pixeladas verdes y doradas ascienden flotando verticalmente sobre la unidad simulando un aura de "subida de nivel".
+4. **Animación de Muerte y Explosión de Partículas**:
+   - Al ser eliminada, la unidad se desintegra con temblor violento, fogonazo blanco/rojo y reducción a cero.
+   - Explosión radial en 360 grados de 24 fragmentos pixelados (rojo, naranja, ceniza, blanco y dorado) que se dispersan con gravedad y rotación.
+
+---
+
+# 📝 Notas del Parche — Versión 0.4.6: Rediseño de Indicador de Listo y Confirmación de Rondas con Espacio y Enter
+
+## 🚀 Resumen del Lanzamiento
+Esta versión pule la usabilidad y diseño del flujo de rondas y confirmaciones:
+1. **Rediseño del Indicador de Listo**:
+   - Se eliminó el encapsulador / div con borde de botón en `.player-ready-bar`, dejándolo como un elemento limpio sin fondos ni marcos pesados.
+   - El checkbox es ahora un cuadrado nítido que se torna verde esmeralda brillante (`#10b981`) con checkmark oscuro de alto contraste al marcarse listo.
+   - El texto acompaña de forma continua y fluida: `[ESPACIO] LISTO` para Jugador 1 y `[ENTER] LISTO` para Jugador 2 (o `IA LISTA` en modo vs IA).
+2. **Confirmación de Rondas y Cortinilla con ESPACIO y ENTER**:
+   - Se sustituyeron las antiguas indicaciones y confirmaciones de teclas `S` y `K` por `[ESPACIO]` (Jugador 1) y `[ENTER]` (Jugador 2).
+   - Las cortinillas de inicio de ronda y tirada de dados sobre los tableros muestran `ESPACIO` y `ENTER` respectivamente, coincidiendo con las reglas canónicas del juego.
+
+---
+
+# 📝 Notas del Parche — Versión 0.4.5: Ajuste de Proporciones en Pantalla de Combate, Sprites de Héroe Ampliados y Tablero Anclado
+
+## 🚀 Resumen del Lanzamiento
+Esta versión realiza una revisión exhaustiva de las proporciones visuales de la interfaz de juego / combate:
+1. **Sprites de Personajes Significativamente Más Grandes**:
+   - Se incrementó el tamaño base de los sprites animados de héroe de **96px (escalados a 76px)** a **128px** con escalado entero 2x y renderizado nítido `image-rendering: pixelated;`.
+   - La zona superior (`.battle-top-section`) se amplió de **135px a 220px** de altura, y los paneles laterales (`.game-side-panel`) de **200px a 250px** de anchura, otorgando a los héroes un escenario espacioso, imponente y sin recortes.
+   - Alineación simétrica de la barra de tensión (`[ 0 / 100 ]`) y el botón de `LISTO` entre ambos jugadores mediante anclaje inferior automático.
+2. **Tableros 3x3 Más Grandes y Anclados Abajo**:
+   - Se incrementó el tamaño de las casillas de **90px a 106px** y el tamaño total de la cuadrícula de **290px a 334px**, mejorando la legibilidad de peones, insignias SVG y etiquetas de teclas (`[Q, W, E...]`).
+   - El contenedor inferior (`.battle-bottom-boards-container`) ahora ancla los tableros hacia la parte inferior (`align-items: flex-end; padding-bottom: 32px;`), asentando firmemente la acción y dejando un área superior limpia para animaciones y partículas.
+   - Los avatares de peones crecieron de **58px a 70px** y las insignias de estadísticas SVG de **25px a 28px**.
+3. **Equilibrio de Composición General**:
+   - Ajuste del ancho de tarjeta a **1060px** y centrado automático en el contenedor principal (`#app-dynamic-content`), logrando un aspecto arcade imponente y perfectamente balanceado.
+
+---
+
+# 📝 Notas del Parche — Versión 0.4.4: Secuenciación Canónica de Holo, Animación de Escudo y Duración de 1 Ronda
+
+## 🚀 Resumen del Lanzamiento
+Esta versión implementa la sincronización canónica y el ciclo de vida de los escudos para **Holo**:
+1. **Pasiva de Holo al Inicio de Resolución**: En la fase de resolución (`RESOLUTION`), lo primero que ocurre antes de las habilidades activas y los ataques es que Holo otorga 1 escudo a una unidad aliada aleatoria (o +1 de ataque al *Espejo Frágil*). Se acompaña de una animación holográfica vectorial (onda cian expansiva, icono SVG pulsante y badge de reacción), sonido sintetizado dedicado y una pausa rítmica para que el jugador perciba con claridad el momento en que se concede el escudo.
+2. **Duración Canónica de los Escudos (1 Ronda)**: Siguiendo la regla de diseño, cada escudo dura una ronda. Protege durante la fase de combate de la ronda en curso; si la habilidad activa *Sobrecarga de Escudos* se activa, se convierte en estadísticas permanentes +1/+1; si recibe impacto, absorbe el daño. Aquellos escudos no consumidos caducan ordenadamente al finalizar la ronda (`shieldExpiresAtRound`).
+3. **Prisma Holográfico (Unidad Mediana de Holo)**: La ronda siguiente a la que el jugador dispara a una unidad enemiga, la unidad mediana recibe un escudo (+1) con animación visual y sonido, activo durante esa ronda.
+
+---
+
+# 📝 Notas del Parche — Versión 0.4.3: Estilo Mixto (Vector Minimalista + Pixel Art) e Insignias SVG de Stats
+
+## 🚀 Resumen del Lanzamiento
+Esta versión inicia la transición visual del juego hacia un estilo mixto moderno, combinando una interfaz vectorial limpia y minimalista con el arte gráfico pixel art de los personajes y unidades:
+1. **Insignias Vectoriales SVG para Stats de Peones**: Se sustituyen los antiguos cuadros/divs rectangulares de estadísticas por los tres iconos vectoriales SVG dedicados:
+   - **Ataque (ATK)**: Rombo naranja vectorial (`UI_PawnIcon_Atk.svg`) posicionado en la esquina superior izquierda con el valor numérico de ataque superpuesto en el centro.
+   - **Vida (HP)**: Corazón rojo vectorial (`UI_PawnIcon_HP.svg`) posicionado en la esquina superior derecha con el valor numérico de vida superpuesto en el centro, incluyendo animaciones reactivas (pulso crítico para 1 HP, aura dorada para 3-5 HP y aura celestial para 6+ HP).
+   - **Escudo (Shield)**: Escudo cian vectorial (`UI_PawnIcon_Shield.svg`) en la esquina inferior derecha mostrando el valor de protección cuando el peón dispone de escudo.
+2. **Tipografía Vectorial Nítida**: Los números de las estadísticas emplean la fuente sans-serif geométrica moderna (`Outfit`) en peso 900 con contorno de alto contraste, ofreciendo legibilidad óptima e integrándose con la estética pixel art de los sprites.
+3. **Corrección de la Pasiva y Escudos de Holo**:
+   - Se corrigió la ejecución de la pasiva de Holo para que ocurra al inicio de la fase de acción (`PHASE_ACTION_SELECT`), otorgando escudo a una unidad aliada aleatoria (o +1 de ataque si es la unidad pequeña *Espejo Frágil*).
+   - Se eliminó el borrado prematuro de escudos antes de renderizar, asegurando que el icono vectorial de escudo sea visible durante toda la fase de selección táctica y combate.
+   - La habilidad activa de Holo (*Sobrecarga de Escudos*) ahora convierte correctamente los escudos activos en +1/+1 de daño y vida permanente refrescando el tablero de inmediato.
+   - Los escudos generados en combate por el *Prisma Holográfico* (Mediana de Holo) al dañar al enemigo se preservan y muestran de inmediato, sobreviviendo para proteger o convertirse en la siguiente ronda.
+
+---
+
 # 📝 Notas del Parche — Versión 0.4.2: Flujo Sincronizado de Acción y Sistema de Cargas Unitario
 
 ## 🚀 Resumen del Lanzamiento
